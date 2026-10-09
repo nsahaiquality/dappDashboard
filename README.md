@@ -33,7 +33,8 @@ src/
                                   statistics queries, market simulator
   AssetDashboard.Api/             ASP.NET Core minimal API, SignalR hub, snapshot broadcaster
 tests/
-  AssetDashboard.Tests/           xUnit tests (domain maths, generator realism)
+  AssetDashboard.Tests/           xUnit unit tests (domain maths, generator realism, filters)
+  AssetDashboard.IntegrationTests/ Real API + Postgres via Testcontainers (every query, hub, simulator)
 web/                              Angular 22 frontend (signals, zoneless, router, Chart.js, @microsoft/signalr, IBM Plex)
 docs/                             Architecture and domain model
 backlog/                          Jira import file (epics + tasks)
@@ -91,7 +92,8 @@ To regenerate the data, drop the database (`docker compose down -v`) and restart
 ## Development
 
 ```bash
-dotnet test                                    # backend tests
+dotnet test tests/AssetDashboard.Tests           # unit tests (no Docker needed)
+dotnet test tests/AssetDashboard.IntegrationTests # API + queries against a throwaway Postgres (Docker required)
 cd web && npx ng build                         # frontend build check
 dotnet ef migrations add <Name> -p src/AssetDashboard.Infrastructure -s src/AssetDashboard.Infrastructure -o Data/Migrations
 ```

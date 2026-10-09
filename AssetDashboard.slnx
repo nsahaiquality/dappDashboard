@@ -5,6 +5,7 @@
     <Project Path="src/AssetDashboard.Infrastructure/AssetDashboard.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AssetDashboard.IntegrationTests/AssetDashboard.IntegrationTests.csproj" />
     <Project Path="tests/AssetDashboard.Tests/AssetDashboard.Tests.csproj" />
   </Folder>
 </Solution>

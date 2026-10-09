@@ -10,6 +10,17 @@ using System.Globalization;
 
 namespace AssetDashboard.Infrastructure.Simulation;
 
+public enum SimulationStep
+{
+    Revalue,
+    ReceivePayment,
+    MissPayment,
+    Repossess,
+    ListForSale,
+    Sell,
+    MarketShock,
+}
+
 public sealed class SimulatorOptions
 {
     public bool Enabled { get; set; } = true;
@@ -59,15 +70,28 @@ public sealed class MarketSimulator(
         }
     }
 
-    private Task<PortfolioEvent?> NextEventAsync(AssetDbContext db, CancellationToken ct) => _rng.NextDouble() switch
+    private Task<PortfolioEvent?> NextEventAsync(AssetDbContext db, CancellationToken ct) => StepAsync(db, _rng.NextDouble() switch
     {
-        < 0.40 => RevalueAsync(db, ct),
-        < 0.65 => ReceivePaymentAsync(db, ct),
-        < 0.82 => MissPaymentAsync(db, ct),
-        < 0.90 => RepossessAsync(db, ct),
-        < 0.95 => ListForSaleAsync(db, ct),
-        < 0.99 => SellAsync(db, ct),
-        _ => MarketShockAsync(db, ct),
+        < 0.40 => SimulationStep.Revalue,
+        < 0.65 => SimulationStep.ReceivePayment,
+        < 0.82 => SimulationStep.MissPayment,
+        < 0.90 => SimulationStep.Repossess,
+        < 0.95 => SimulationStep.ListForSale,
+        < 0.99 => SimulationStep.Sell,
+        _ => SimulationStep.MarketShock,
+    }, ct);
+
+    /// <summary>Runs one specific kind of change; used by the loop above and by integration tests.</summary>
+    public Task<PortfolioEvent?> StepAsync(AssetDbContext db, SimulationStep step, CancellationToken ct = default) => step switch
+    {
+        SimulationStep.Revalue => RevalueAsync(db, ct),
+        SimulationStep.ReceivePayment => ReceivePaymentAsync(db, ct),
+        SimulationStep.MissPayment => MissPaymentAsync(db, ct),
+        SimulationStep.Repossess => RepossessAsync(db, ct),
+        SimulationStep.ListForSale => ListForSaleAsync(db, ct),
+        SimulationStep.Sell => SellAsync(db, ct),
+        SimulationStep.MarketShock => MarketShockAsync(db, ct),
+        _ => throw new ArgumentOutOfRangeException(nameof(step)),
     };
 
     private async Task<PortfolioEvent?> RevalueAsync(AssetDbContext db, CancellationToken ct)
