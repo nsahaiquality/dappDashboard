@@ -63,7 +63,7 @@ dotnet run --project src/AssetDashboard.Api          # http://localhost:5080
 cd web && npm install && npm start                   # http://localhost:4200
 ```
 
-Useful endpoints:
+Useful endpoints (all documented, with try-it-out, at http://localhost:5080/swagger):
 
 | Endpoint | Purpose |
 |---|---|
@@ -84,7 +84,8 @@ Useful endpoints:
 | `GET /api/sources` / `GET /api/sources/{id}/runs` | Source systems with freshness, and their load runs |
 | `POST /api/simulator/pause` / `resume` | Stop or start the live data simulator |
 | `/hubs/dashboard` | SignalR hub: server sends `Snapshot` and `PortfolioEvent`; client calls `SetFilter(filter)` |
-| `/openapi/v1.json` | OpenAPI document (Development) |
+| `/swagger` | **Interactive API documentation** (Swagger UI; the API root redirects here). Set `ApiDocs:Enabled=false` to turn off |
+| `/openapi/v1.json` | OpenAPI document behind the Swagger page |
 | `/health` | Health check |
 
 ### Configuration (`src/AssetDashboard.Api/appsettings.Development.json`)
