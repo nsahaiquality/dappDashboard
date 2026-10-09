@@ -47,3 +47,6 @@ SCRUM-49,T39,Task,"Containerise API and web (Dockerfiles), compose for full stac
 SCRUM-50,T40,Task,"Load test: 1M+ assets, snapshot latency and query plans",Add pg_trgm index for search; consider materialised views.,E6,asset-dashboard,To Do
 SCRUM-51,T41,Task,Deployment target decision (Azure App Service / AKS / on-prem IIS),,E6,asset-dashboard,To Do
 SCRUM-52,T42,Task,End-to-end verification against local Postgres and fixes,Run full stack locally; fix issues found.,E3,asset-dashboard,Done
+SCRUM-53,T43,Task,Professional BI dashboard redesign (UI/UX),Redesign to industry-leading BI standard; design canvas + implementation.,E4,asset-dashboard ui-ux,In Progress
+SCRUM-54,T44,Subtask,"Backend: global filters, per-filter SignalR snapshots, asset LTV/sort/export, exposure history",,T43,asset-dashboard ui-ux,Done
+SCRUM-55,T45,Subtask,Frontend: implement approved redesign in Angular,,T43,asset-dashboard ui-ux,Done
