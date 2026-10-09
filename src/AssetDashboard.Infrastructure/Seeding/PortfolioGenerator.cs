@@ -16,46 +16,64 @@ public sealed class PortfolioGenerator(int seed = 42)
 
     public sealed record Portfolio(List<Vendor> Vendors, List<Customer> Customers, List<Contract> Contracts, List<Auction> Auctions);
 
+    private Dictionary<AssetClass, List<Vendor>> _vendorsByClass = [];
+    private Dictionary<AssetClass, List<Customer>> _customersByClass = [];
+    private readonly Dictionary<Vendor, decimal> _originatedLastYear = [];
+    private DateOnly _asOf;
+
+    /// <summary>Generates the whole portfolio in memory (fine up to a few hundred thousand contracts).</summary>
     public Portfolio Generate(int contractCount, DateTime asOfUtc)
     {
-        var asOf = DateOnly.FromDateTime(asOfUtc);
+        var (vendors, customers) = CreateParties(contractCount, asOfUtc);
+        var contracts = CreateContracts(contractCount).ToList();
+        ApplyVolumeTargets();
+        return new Portfolio(vendors, customers, contracts, Auctions.OrderBy(a => a.Date).ToList());
+    }
 
-        var vendorsByClass = AssetCatalog.Classes.ToDictionary(
+    /// <summary>Step 1 of streaming generation: vendors and customers sized for <paramref name="contractCount"/>.</summary>
+    public (List<Vendor> Vendors, List<Customer> Customers) CreateParties(int contractCount, DateTime asOfUtc)
+    {
+        _asOf = DateOnly.FromDateTime(asOfUtc);
+        _vendorsByClass = AssetCatalog.Classes.ToDictionary(
             c => c.AssetClass,
             c => Enumerable.Range(0, Math.Max(3, (int)(contractCount / 120.0 * c.PortfolioWeight)))
                 .Select(_ => NewVendor(c)).ToList());
-
-        var customersByClass = AssetCatalog.Classes.ToDictionary(
+        _customersByClass = AssetCatalog.Classes.ToDictionary(
             c => c.AssetClass,
             c => Enumerable.Range(0, Math.Max(5, (int)(contractCount * 0.6 * c.PortfolioWeight)))
                 .Select(_ => NewCustomer(c)).ToList());
+        return (_vendorsByClass.Values.SelectMany(v => v).ToList(), _customersByClass.Values.SelectMany(c => c).ToList());
+    }
 
-        var contracts = new List<Contract>(contractCount);
+    /// <summary>Step 2: contracts one at a time, so callers can write them in chunks without holding them all.</summary>
+    public IEnumerable<Contract> CreateContracts(int contractCount)
+    {
+        var since = _asOf.AddYears(-1);
         for (var i = 1; i <= contractCount; i++)
         {
             var info = Weighted(AssetCatalog.Classes.Select(c => (c, c.PortfolioWeight)));
             // Vendor volumes are skewed: a few large partners write most of the business.
-            var vendors = vendorsByClass[info.AssetClass];
+            var vendors = _vendorsByClass[info.AssetClass];
             var vendor = vendors[(int)(vendors.Count * Math.Pow(_rng.NextDouble(), 2.2))];
-            var customer = Pick(customersByClass[info.AssetClass]);
-            contracts.Add(NewContract(i, info, vendor, customer, asOf));
+            var customer = Pick(_customersByClass[info.AssetClass]);
+            var contract = NewContract(i, info, vendor, customer, _asOf);
+            if (contract.StartDate >= since)
+                _originatedLastYear[vendor] = _originatedLastYear.GetValueOrDefault(vendor) + contract.FinancedAmount;
+            yield return contract;
         }
+    }
 
-        // Volume targets: roughly the last year's actual origination, give or take, so attainment varies.
-        var since = asOf.AddYears(-1);
-        var originated = contracts.Where(c => c.StartDate >= since).GroupBy(c => c.Vendor)
-            .ToDictionary(g => g.Key, g => g.Sum(c => c.FinancedAmount));
-        foreach (var vendor in vendorsByClass.Values.SelectMany(v => v))
+    /// <summary>Auctions created so far (grows while contracts are generated).</summary>
+    public IReadOnlyCollection<Auction> Auctions => _auctions.Values;
+
+    /// <summary>Step 3: volume targets around last year's actual origination, so attainment varies.</summary>
+    public void ApplyVolumeTargets()
+    {
+        foreach (var vendor in _vendorsByClass.Values.SelectMany(v => v))
         {
-            var actual = originated.GetValueOrDefault(vendor);
+            var actual = _originatedLastYear.GetValueOrDefault(vendor);
             vendor.AnnualVolumeTarget = RoundTo(actual > 0 ? (double)actual * Uniform(0.85, 1.35) : Uniform(250_000, 2_000_000), 50_000);
         }
-
-        return new Portfolio(
-            vendorsByClass.Values.SelectMany(v => v).ToList(),
-            customersByClass.Values.SelectMany(c => c).ToList(),
-            contracts,
-            _auctions.Values.OrderBy(a => a.Date).ToList());
     }
 
     private Vendor NewVendor(AssetCatalog.ClassInfo info)
