@@ -28,6 +28,7 @@ public class AssetDbContext(DbContextOptions<AssetDbContext> options) : DbContex
         {
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.Country).HasMaxLength(2);
+            e.Property(x => x.Rating).HasMaxLength(1);
         });
 
         b.Entity<Customer>(e =>

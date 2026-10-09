@@ -110,3 +110,23 @@ public enum AuctionStatus
     Scheduled,
     Completed,
 }
+
+public enum VendorProgramType
+{
+    /// <summary>Manufacturer programme (captive-style), usually with buy-back support.</summary>
+    Manufacturer,
+    Dealer,
+    Distributor,
+}
+
+/// <summary>What the vendor guarantees if the customer defaults.</summary>
+public enum RecourseType
+{
+    None,
+    /// <summary>Vendor covers part of the loss, capped.</summary>
+    PartialRecourse,
+    /// <summary>Vendor covers the full outstanding balance.</summary>
+    FullRecourse,
+    /// <summary>Vendor buys the repossessed asset back at an agreed price.</summary>
+    BuyBack,
+}

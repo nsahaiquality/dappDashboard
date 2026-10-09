@@ -41,6 +41,16 @@ public sealed class PortfolioGenerator(int seed = 42)
             contracts.Add(NewContract(i, info, vendor, customer, asOf));
         }
 
+        // Volume targets: roughly the last year's actual origination, give or take, so attainment varies.
+        var since = asOf.AddYears(-1);
+        var originated = contracts.Where(c => c.StartDate >= since).GroupBy(c => c.Vendor)
+            .ToDictionary(g => g.Key, g => g.Sum(c => c.FinancedAmount));
+        foreach (var vendor in vendorsByClass.Values.SelectMany(v => v))
+        {
+            var actual = originated.GetValueOrDefault(vendor);
+            vendor.AnnualVolumeTarget = RoundTo(actual > 0 ? (double)actual * Uniform(0.85, 1.35) : Uniform(250_000, 2_000_000), 50_000);
+        }
+
         return new Portfolio(
             vendorsByClass.Values.SelectMany(v => v).ToList(),
             customersByClass.Values.SelectMany(c => c).ToList(),
@@ -52,11 +62,23 @@ public sealed class PortfolioGenerator(int seed = 42)
     {
         var country = WeightedCountry();
         var prefix = _rng.NextDouble() < 0.5 ? Pick(country.Surnames) : Pick(country.Cities);
+        // Imaging and IT makers typically back their programmes with buy-back; machinery dealers with partial recourse.
+        var manufacturerLed = info.AssetClass is AssetClass.Healthcare or AssetClass.Technology or AssetClass.CleanTech;
+        var program = manufacturerLed
+            ? Weighted([(VendorProgramType.Manufacturer, 0.6), (VendorProgramType.Distributor, 0.3), (VendorProgramType.Dealer, 0.1)])
+            : Weighted([(VendorProgramType.Dealer, 0.65), (VendorProgramType.Distributor, 0.2), (VendorProgramType.Manufacturer, 0.15)]);
+        var recourse = program == VendorProgramType.Manufacturer
+            ? Weighted([(RecourseType.BuyBack, 0.6), (RecourseType.FullRecourse, 0.2), (RecourseType.PartialRecourse, 0.2)])
+            : Weighted([(RecourseType.PartialRecourse, 0.45), (RecourseType.None, 0.4), (RecourseType.BuyBack, 0.15)]);
         return new Vendor
         {
             Name = $"{prefix} {info.VendorNoun} {country.LegalForm}",
             PrimaryAssetClass = info.AssetClass,
             Country = country.Code,
+            ProgramType = program,
+            Recourse = recourse,
+            Rating = Weighted([("A", 0.2), ("B", 0.45), ("C", 0.28), ("D", 0.07)]),
+            OnboardedOn = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-_rng.Next(2 * 365, 15 * 365)),
         };
     }
 

@@ -8,6 +8,14 @@ public class Vendor
     public AssetClass PrimaryAssetClass { get; set; }
     public required string Country { get; set; }
 
+    public VendorProgramType ProgramType { get; set; }
+    public RecourseType Recourse { get; set; }
+    /// <summary>Internal vendor rating, A (strongest) to D.</summary>
+    public string Rating { get; set; } = "B";
+    public DateOnly OnboardedOn { get; set; }
+    /// <summary>Agreed annual origination volume (financed amount) for the programme.</summary>
+    public decimal AnnualVolumeTarget { get; set; }
+
     public List<Contract> Contracts { get; set; } = [];
 }
 
