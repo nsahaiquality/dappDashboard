@@ -1,16 +1,25 @@
+using System.Linq.Expressions;
 using AssetDashboard.Domain;
 using AssetDashboard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace AssetDashboard.Infrastructure.Dashboard;
 
+public enum AssetSort
+{
+    MarketValue,
+    Ltv,
+    DaysPastDue,
+}
+
 /// <summary>Computes portfolio statistics with server-side (SQL) aggregation.</summary>
 public sealed class PortfolioStatsService(AssetDbContext db)
 {
-    public async Task<PortfolioSnapshot> GetSnapshotAsync(CancellationToken ct = default)
+    public async Task<PortfolioSnapshot> GetSnapshotAsync(PortfolioFilter? filter = null, CancellationToken ct = default)
     {
-        var openContracts = db.Contracts.AsNoTracking().Where(c => c.Status != ContractStatus.Closed);
-        var activeAssets = db.Assets.AsNoTracking().Where(a => a.Status != AssetStatus.Sold);
+        filter = (filter ?? PortfolioFilter.None).Normalize();
+        var openContracts = filter.Apply(db.Contracts.AsNoTracking().Where(c => c.Status != ContractStatus.Closed));
+        var activeAssets = filter.Apply(db.Assets.AsNoTracking().Where(a => a.Status != AssetStatus.Sold));
 
         var contractTotals = await openContracts
             .GroupBy(_ => 1)
@@ -90,14 +99,15 @@ public sealed class PortfolioStatsService(AssetDbContext db)
             ForcedSaleShortfall: shortfall,
             ByAssetClass: byClass,
             Delinquency: buckets,
-            Remarketing: await GetRemarketingAsync(ct),
+            Remarketing: await GetRemarketingAsync(filter, ct),
             TopVendors: topVendors,
-            ByCountry: byCountry);
+            ByCountry: byCountry,
+            Filter: filter);
     }
 
-    private async Task<RemarketingStat> GetRemarketingAsync(CancellationToken ct)
+    private async Task<RemarketingStat> GetRemarketingAsync(PortfolioFilter filter, CancellationToken ct)
     {
-        var cases = db.RemarketingCases.AsNoTracking();
+        var cases = filter.Apply(db.RemarketingCases.AsNoTracking());
         var counts = await cases
             .GroupBy(c => c.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })
@@ -131,14 +141,43 @@ public sealed class PortfolioStatsService(AssetDbContext db)
             Math.Round(averageDaysToSell, 1));
     }
 
-    public async Task<PagedResult<AssetListItem>> GetAssetsAsync(AssetClass? assetClass, AssetStatus? status,
-        string? search, int page, int pageSize, CancellationToken ct = default)
+    public async Task<ReferenceData> GetReferenceDataAsync(CancellationToken ct = default)
+    {
+        var vendors = await db.Vendors.AsNoTracking()
+            .OrderBy(v => v.Name)
+            .Select(v => new VendorOption(v.Id, v.Name, v.PrimaryAssetClass))
+            .ToListAsync(ct);
+        var countries = await db.Customers.AsNoTracking()
+            .Select(c => c.Country).Distinct().OrderBy(c => c)
+            .ToListAsync(ct);
+        return new ReferenceData(vendors, countries);
+    }
+
+    public async Task<PagedResult<AssetListItem>> GetAssetsAsync(PortfolioFilter filter, AssetStatus? status, string? search,
+        AssetSort sort, int page, int pageSize, CancellationToken ct = default)
     {
         pageSize = Math.Clamp(pageSize, 1, 200);
         page = Math.Max(1, page);
 
-        var query = db.Assets.AsNoTracking();
-        if (assetClass is not null) query = query.Where(a => a.AssetClass == assetClass);
+        var query = FilteredAssets(filter, status, search);
+        var total = await query.CountAsync(ct);
+        var items = await Sorted(query, sort)
+            .Select(ToListItem)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return new PagedResult<AssetListItem>(items, total, page, pageSize);
+    }
+
+    /// <summary>Streams every matching asset (capped) for CSV export.</summary>
+    public IAsyncEnumerable<AssetListItem> StreamAssetsAsync(PortfolioFilter filter, AssetStatus? status, string? search,
+        AssetSort sort, int max) =>
+        Sorted(FilteredAssets(filter, status, search), sort).Select(ToListItem).Take(max).AsAsyncEnumerable();
+
+    private IQueryable<Asset> FilteredAssets(PortfolioFilter filter, AssetStatus? status, string? search)
+    {
+        var query = filter.Normalize().Apply(db.Assets.AsNoTracking());
         if (status is not null) query = query.Where(a => a.Status == status);
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -147,47 +186,79 @@ public sealed class PortfolioStatsService(AssetDbContext db)
                                      || EF.Functions.ILike(a.Category, pattern)
                                      || EF.Functions.ILike(a.Contract.ContractNumber, pattern));
         }
-
-        var total = await query.CountAsync(ct);
-        var items = await query
-            .OrderByDescending(a => a.MarketValue)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(ToListItem)
-            .ToListAsync(ct);
-
-        return new PagedResult<AssetListItem>(items, total, page, pageSize);
+        return query;
     }
+
+    // Sorting happens on the entity, before projecting to the DTO, so EF Core can translate it.
+    private static IQueryable<Asset> Sorted(IQueryable<Asset> query, AssetSort sort) => sort switch
+    {
+        AssetSort.Ltv => query
+            .OrderByDescending(a => a.Status == AssetStatus.Sold
+                                    || a.Contract.Assets.Where(x => x.Status != AssetStatus.Sold).Sum(x => x.MarketValue) == 0
+                ? 0
+                : a.Contract.OutstandingPrincipal / a.Contract.Assets.Where(x => x.Status != AssetStatus.Sold).Sum(x => x.MarketValue))
+            .ThenBy(a => a.Id),
+        AssetSort.DaysPastDue => query.OrderByDescending(a => a.Contract.DaysPastDue).ThenByDescending(a => a.MarketValue).ThenBy(a => a.Id),
+        _ => query.OrderByDescending(a => a.MarketValue).ThenBy(a => a.Id),
+    };
 
     public async Task<AssetDetail?> GetAssetAsync(long id, CancellationToken ct = default)
     {
-        var asset = await db.Assets.AsNoTracking()
+        var row = await db.Assets.AsNoTracking()
             .Where(a => a.Id == id)
             .Select(a => new
             {
                 Item = new AssetListItem(a.Id, a.SerialNumber, a.AssetClass, a.Category, a.Manufacturer, a.Model,
                     a.YearOfManufacture, a.Status, a.Condition, a.Country, a.City, a.MarketValue, a.ForcedSaleValue,
-                    a.LastValuedAt, a.Contract.ContractNumber, a.Contract.DaysPastDue),
+                    a.LastValuedAt, a.Contract.ContractNumber, a.Contract.DaysPastDue,
+                    a.Status == AssetStatus.Sold ? (decimal?)null
+                        : a.Contract.Assets.Where(x => x.Status != AssetStatus.Sold).Sum(x => x.MarketValue) == 0 ? (decimal?)null
+                        : a.Contract.OutstandingPrincipal / a.Contract.Assets.Where(x => x.Status != AssetStatus.Sold).Sum(x => x.MarketValue)),
                 a.OriginalCost,
+                ContractCost = a.Contract.Assets.Sum(x => x.OriginalCost),
                 a.Contract.OutstandingPrincipal,
+                a.Contract.FinancedAmount,
+                a.Contract.InterestRate,
+                a.Contract.MonthlyInstallment,
+                a.Contract.StartDate,
+                a.Contract.TermMonths,
+                a.Contract.ProductType,
+                a.Contract.Status,
                 CustomerName = a.Contract.Customer.Name,
                 a.Contract.Customer.RiskGrade,
                 VendorName = a.Contract.Vendor.Name,
                 Valuations = a.Valuations.OrderBy(v => v.ValuedAt)
-                    .Select(v => new ValuationPoint(v.ValuedAt, v.MarketValue, v.ForcedSaleValue, v.Method)).ToList(),
+                    .Select(v => new { v.ValuedAt, v.MarketValue, v.ForcedSaleValue, v.Method }).ToList(),
             })
             .FirstOrDefaultAsync(ct);
+        if (row is null) return null;
 
-        return asset is null
-            ? null
-            : new AssetDetail(asset.Item, asset.OriginalCost, asset.OutstandingPrincipal, asset.CustomerName,
-                asset.RiskGrade, asset.VendorName, asset.Valuations);
+        // This asset's share of the contract balance, along the amortisation schedule at each valuation date.
+        var share = row.ContractCost == 0 ? 0 : row.OriginalCost / row.ContractCost;
+        var latest = row.Valuations.Count - 1;
+        var points = row.Valuations.Select((v, i) =>
+        {
+            var exposure = i == latest || row.Status == ContractStatus.Closed
+                ? row.OutstandingPrincipal
+                : Amortization.OutstandingAfter(row.FinancedAmount, row.InterestRate, row.MonthlyInstallment,
+                    MonthsBetween(row.StartDate, DateOnly.FromDateTime(v.ValuedAt)));
+            return new ValuationPoint(v.ValuedAt, v.MarketValue, v.ForcedSaleValue, v.Method, Math.Round(exposure * share, 2));
+        }).ToList();
+
+        return new AssetDetail(row.Item, row.OriginalCost, row.OutstandingPrincipal, Math.Round(row.OutstandingPrincipal * share, 2),
+            row.ProductType, row.TermMonths, row.StartDate, row.CustomerName, row.RiskGrade, row.VendorName, points);
     }
 
-    private static readonly System.Linq.Expressions.Expression<Func<Asset, AssetListItem>> ToListItem = a =>
+    private static readonly Expression<Func<Asset, AssetListItem>> ToListItem = a =>
         new AssetListItem(a.Id, a.SerialNumber, a.AssetClass, a.Category, a.Manufacturer, a.Model,
             a.YearOfManufacture, a.Status, a.Condition, a.Country, a.City, a.MarketValue, a.ForcedSaleValue,
-            a.LastValuedAt, a.Contract.ContractNumber, a.Contract.DaysPastDue);
+            a.LastValuedAt, a.Contract.ContractNumber, a.Contract.DaysPastDue,
+            a.Status == AssetStatus.Sold ? (decimal?)null
+                : a.Contract.Assets.Where(x => x.Status != AssetStatus.Sold).Sum(x => x.MarketValue) == 0 ? (decimal?)null
+                : a.Contract.OutstandingPrincipal / a.Contract.Assets.Where(x => x.Status != AssetStatus.Sold).Sum(x => x.MarketValue));
+
+    private static int MonthsBetween(DateOnly from, DateOnly to) =>
+        Math.Max(0, (to.Year - from.Year) * 12 + to.Month - from.Month - (to.Day < from.Day ? 1 : 0));
 
     private static decimal Ratio(decimal numerator, decimal denominator) =>
         denominator == 0 ? 0 : Math.Round(numerator / denominator, 4);

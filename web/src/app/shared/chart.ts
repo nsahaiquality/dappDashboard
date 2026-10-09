@@ -2,6 +2,7 @@ import { Component, DestroyRef, ElementRef, effect, inject, input, viewChild } f
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 
 Chart.register(...registerables);
+Chart.defaults.font.family = "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif";
 
 /** Reads chart colours from the CSS tokens in styles.scss so light/dark mode stay in one place. */
 export function chartTheme() {
@@ -26,7 +27,6 @@ export function baseOptions(): ChartConfiguration['options'] {
     responsive: true,
     maintainAspectRatio: false,
     animation: { duration: 250 },
-    font: { family: 'system-ui, -apple-system, "Segoe UI", sans-serif' },
     color: t.inkSecondary,
     plugins: {
       legend: { labels: { color: t.inkSecondary, boxWidth: 12, boxHeight: 12, useBorderRadius: true, borderRadius: 2 } },

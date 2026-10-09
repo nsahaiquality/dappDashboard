@@ -20,7 +20,9 @@ public sealed record PortfolioSnapshot(
     IReadOnlyList<DelinquencyBucket> Delinquency,
     RemarketingStat Remarketing,
     IReadOnlyList<VendorStat> TopVendors,
-    IReadOnlyList<CountryStat> ByCountry);
+    IReadOnlyList<CountryStat> ByCountry,
+    // The filter this snapshot was computed for.
+    PortfolioFilter Filter);
 
 public sealed record AssetClassStat(AssetClass AssetClass, int Assets, decimal MarketValue, decimal Exposure, decimal LoanToValue);
 
@@ -66,11 +68,20 @@ public sealed record PortfolioEvent(
 public sealed record AssetListItem(
     long Id, string SerialNumber, AssetClass AssetClass, string Category, string Manufacturer, string Model,
     int YearOfManufacture, AssetStatus Status, AssetCondition Condition, string Country, string City,
-    decimal MarketValue, decimal ForcedSaleValue, DateTime LastValuedAt, string ContractNumber, int DaysPastDue);
+    decimal MarketValue, decimal ForcedSaleValue, DateTime LastValuedAt, string ContractNumber, int DaysPastDue,
+    // Contract exposure ÷ market value of the contract's remaining assets; null once sold.
+    decimal? ContractLtv);
 
-public sealed record ValuationPoint(DateTime ValuedAt, decimal MarketValue, decimal ForcedSaleValue, ValuationMethod Method);
+// ExposureShare: this asset's share of the contract balance at that date (from the amortisation schedule).
+public sealed record ValuationPoint(DateTime ValuedAt, decimal MarketValue, decimal ForcedSaleValue, ValuationMethod Method,
+    decimal ExposureShare);
 
-public sealed record AssetDetail(AssetListItem Asset, decimal OriginalCost, decimal ContractExposure,
+public sealed record AssetDetail(AssetListItem Asset, decimal OriginalCost, decimal ContractExposure, decimal AssetExposure,
+    ProductType ProductType, int TermMonths, DateOnly StartDate,
     string CustomerName, int CustomerRiskGrade, string VendorName, IReadOnlyList<ValuationPoint> Valuations);
+
+public sealed record VendorOption(int Id, string Name, AssetClass AssetClass);
+
+public sealed record ReferenceData(IReadOnlyList<VendorOption> Vendors, IReadOnlyList<string> Countries);
 
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);

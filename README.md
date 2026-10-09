@@ -12,13 +12,17 @@ sold at auction. The stack is **.NET 10 + ASP.NET Core + SignalR**, **PostgreSQL
 
 ## What it shows
 
+- **Global filters:** asset class, country, vendor, product and "underwater only". They drive
+  every widget, and clicking a class, vendor or country in a chart applies that filter.
 - **Headline KPIs:** total exposure, collateral market value and forced sale value, loan-to-value,
   exposure 30+ days past due, shortfall if everything were liquidated now, and recovery rate.
 - **Breakdowns:** exposure vs collateral by asset class, exposure by delinquency bucket, collateral
-  by country, top vendors, and the remarketing pipeline (repossessed → listed → sold).
+  by country, top vendors, the remarketing pipeline (repossessed → listed → sold) and recovery
+  breakdown, and a refinancing watchlist of asset classes with LTV above 100%.
 - **Live event feed:** revaluations, payments, missed payments, defaults, repossessions, auction
   sales and market moves, pushed over SignalR as they happen.
-- **Asset explorer:** a searchable, paged list of assets with each asset's valuation history.
+- **Asset explorer:** a searchable list that can be sorted by value, LTV or days past due, with
+  CSV export and a side panel comparing each asset's valuation history to its share of the exposure.
 
 ## Repository layout
 
@@ -30,7 +34,7 @@ src/
   AssetDashboard.Api/             ASP.NET Core minimal API, SignalR hub, snapshot broadcaster
 tests/
   AssetDashboard.Tests/           xUnit tests (domain maths, generator realism)
-web/                              Angular 22 frontend (signals, zoneless, Chart.js, @microsoft/signalr)
+web/                              Angular 22 frontend (signals, zoneless, router, Chart.js, @microsoft/signalr, IBM Plex)
 docs/                             Architecture and domain model
 backlog/                          Jira import file (epics + tasks)
 docker-compose.yml                PostgreSQL (+ optional pgAdmin)
@@ -62,11 +66,13 @@ Useful endpoints:
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/dashboard/snapshot` | Current portfolio statistics |
-| `GET /api/assets?assetClass=&status=&search=&page=&pageSize=` | Paged asset list |
-| `GET /api/assets/{id}` | Asset detail with valuation history |
+| `GET /api/dashboard/snapshot?assetClass=&country=&vendorId=&productType=&underwaterOnly=` | Portfolio statistics for a filter |
+| `GET /api/reference` | Vendors and countries for the filter dropdowns |
+| `GET /api/assets?<filter>&status=&search=&sort=MarketValue\|Ltv\|DaysPastDue&page=&pageSize=` | Paged asset list |
+| `GET /api/assets/export?<same query>` | CSV export (up to 100k rows) |
+| `GET /api/assets/{id}` | Asset detail with valuation and exposure history |
 | `POST /api/simulator/pause` / `resume` | Stop or start the live data simulator |
-| `/hubs/dashboard` | SignalR hub (`Snapshot`, `PortfolioEvent` messages) |
+| `/hubs/dashboard` | SignalR hub: server sends `Snapshot` and `PortfolioEvent`; client calls `SetFilter(filter)` |
 | `/openapi/v1.json` | OpenAPI document (Development) |
 | `/health` | Health check |
 

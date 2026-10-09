@@ -45,18 +45,27 @@ implements. Replacing the simulator with a real change feed doesn't touch the tr
 
 ## Real-time design
 
-There are two message types on one hub (`DashboardHub`). All data flows **server → client**.
+There are two message types on one hub (`DashboardHub`). Data flows **server → client**; the
+only client → server call is `SetFilter`.
 
 | Message | When | Payload |
 |---|---|---|
 | `PortfolioEvent` | Every individual change | Small: type, message, ids, amount |
-| `Snapshot` | At most once per second, only if something changed (and at least every 30 s) | Full `PortfolioSnapshot` with all KPIs and breakdowns |
+| `Snapshot` | At most once per second, only if something changed (and at least every 30 s) | Full `PortfolioSnapshot` with all KPIs and breakdowns, for the connection's filter |
 
 **Why a throttled snapshot rather than pushing deltas?** Recomputing the aggregates is a handful
 of SQL `GROUP BY`s over indexed columns. Changes are coalesced (a dirty flag checked every
 second), so a burst of 1,000 events still costs one recompute. Clients stay simple: the latest
 snapshot is the whole truth. When a client connects, it immediately gets the latest snapshot plus
 the last 50 events.
+
+**Global filters:** each connection watches one `PortfolioFilter` (asset class, country, vendor,
+product, underwater only) and belongs to the SignalR group named after the filter's key. The
+broadcaster keeps one snapshot per filter that at least one client watches, recomputes them when
+the portfolio changes, and sends each to its group. Clients sharing a filter share the work. A
+filter nobody watches any more is dropped. `SetFilter` replies straight away with a cached or
+freshly computed snapshot, so the UI updates without waiting for the next tick. Events go to
+everyone; the client narrows them by category and asset class.
 
 **Scaling out:** with more than one API instance, add the SignalR Redis backplane
 (`AddStackExchangeRedis`) or Azure SignalR Service. Only one instance should run the snapshot

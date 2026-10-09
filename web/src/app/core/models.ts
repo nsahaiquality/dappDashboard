@@ -15,6 +15,40 @@ export type AssetClass = (typeof ASSET_CLASSES)[number];
 export const ASSET_STATUSES = ['InUse', 'Repossessed', 'InRemarketing', 'Sold', 'Returned'] as const;
 export type AssetStatus = (typeof ASSET_STATUSES)[number];
 
+export const PRODUCT_TYPES = ['FinanceLease', 'OperatingLease', 'Loan', 'HirePurchase'] as const;
+export type ProductType = (typeof PRODUCT_TYPES)[number];
+
+export type AssetSort = 'MarketValue' | 'Ltv' | 'DaysPastDue';
+
+/** Global dashboard filter; mirrors PortfolioFilter on the server. */
+export interface PortfolioFilter {
+  assetClass: AssetClass | null;
+  country: string | null;
+  vendorId: number | null;
+  productType: ProductType | null;
+  underwaterOnly: boolean;
+}
+
+export const NO_FILTER: PortfolioFilter = { assetClass: null, country: null, vendorId: null, productType: null, underwaterOnly: false };
+
+export const sameFilter = (a: PortfolioFilter, b: PortfolioFilter) =>
+  a.assetClass === b.assetClass &&
+  (a.country ?? null) === (b.country ?? null) &&
+  a.vendorId === b.vendorId &&
+  a.productType === b.productType &&
+  a.underwaterOnly === b.underwaterOnly;
+
+export interface VendorOption {
+  id: number;
+  name: string;
+  assetClass: AssetClass;
+}
+
+export interface ReferenceData {
+  vendors: VendorOption[];
+  countries: string[];
+}
+
 export type AssetCondition = 'Excellent' | 'Good' | 'Fair' | 'Poor';
 export type ValuationMethod = 'Invoice' | 'IndexBased' | 'PhysicalInspection' | 'AuctionComparable';
 
@@ -33,6 +67,7 @@ export interface PortfolioSnapshot {
   remarketing: RemarketingStat;
   topVendors: VendorStat[];
   byCountry: CountryStat[];
+  filter: PortfolioFilter;
 }
 
 export interface AssetClassStat {
@@ -110,6 +145,8 @@ export interface AssetListItem {
   lastValuedAt: string;
   contractNumber: string;
   daysPastDue: number;
+  /** Contract exposure ÷ market value of its remaining assets; null once sold. */
+  contractLtv: number | null;
 }
 
 export interface ValuationPoint {
@@ -117,12 +154,18 @@ export interface ValuationPoint {
   marketValue: number;
   forcedSaleValue: number;
   method: ValuationMethod;
+  /** This asset's share of the contract balance at that date. */
+  exposureShare: number;
 }
 
 export interface AssetDetail {
   asset: AssetListItem;
   originalCost: number;
   contractExposure: number;
+  assetExposure: number;
+  productType: ProductType;
+  termMonths: number;
+  startDate: string;
   customerName: string;
   customerRiskGrade: number;
   vendorName: string;

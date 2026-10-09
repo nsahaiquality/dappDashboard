@@ -1,0 +1,139 @@
+<app-page-header title="Asset explorer">
+  <a class="btn primary" [href]="exportUrl()" download><app-icon name="download" [size]="16" />Export CSV</a>
+</app-page-header>
+
+<app-filter-bar />
+
+<div class="row align-start">
+  <section class="card flush grow-3" aria-label="Assets">
+    <div class="table-tools">
+      <label class="search">
+        <app-icon name="search" [size]="16" />
+        <span class="visually-hidden">Search assets</span>
+        <input type="search" placeholder="Serial, category or contract number" [value]="searchDraft()"
+          (input)="onSearchInput($any($event.target).value)" (keydown.enter)="applySearch($any($event.target).value)" />
+      </label>
+      <label class="field">Status
+        <select (change)="setStatus($any($event.target).value)">
+          <option value="">All</option>
+          @for (st of statuses; track st) { <option [value]="st" [selected]="status() === st">{{ humanize(st) }}</option> }
+        </select>
+      </label>
+      @if (chips().length) {
+        <div class="chips">
+          @for (c of chips(); track c.label) {
+            <span class="chip removable">{{ c.label }}
+              <button type="button" [attr.aria-label]="'Remove filter ' + c.label" (click)="c.remove()"><app-icon name="close" [size]="12" [stroke]="2.4" /></button>
+            </span>
+          }
+        </div>
+      }
+      <span class="filter-count num">{{ int(total()) }} assets</span>
+    </div>
+
+    <div class="table-wrap" [class.loading]="loading()">
+      <table class="table data">
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th>Status</th>
+            <th>Location</th>
+            <th class="num" [attr.aria-sort]="ariaSort('MarketValue')">
+              <button type="button" class="sort" [class.active]="sort() === 'MarketValue'" (click)="setSort('MarketValue')">Market value<app-icon name="down" [size]="12" /></button>
+            </th>
+            <th class="num">Forced sale</th>
+            <th class="num" [attr.aria-sort]="ariaSort('Ltv')">
+              <button type="button" class="sort" [class.active]="sort() === 'Ltv'" (click)="setSort('Ltv')">LTV<app-icon name="down" [size]="12" /></button>
+            </th>
+            <th class="num" [attr.aria-sort]="ariaSort('DaysPastDue')">
+              <button type="button" class="sort" [class.active]="sort() === 'DaysPastDue'" (click)="setSort('DaysPastDue')">DPD<app-icon name="down" [size]="12" /></button>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (a of items(); track a.id) {
+            <tr class="clickable" tabindex="0" [class.active]="selected()?.asset?.id === a.id" (click)="open(a)" (keydown.enter)="open(a)"
+              [attr.aria-selected]="selected()?.asset?.id === a.id">
+              <td>
+                <div class="strong">{{ a.category }}</div>
+                <div class="muted small"><span class="mono">{{ a.serialNumber }}</span> · {{ humanize(a.assetClass) }}</div>
+              </td>
+              <td><span class="pill {{ statusTone[a.status] }}">{{ humanize(a.status) }}</span></td>
+              <td class="muted">{{ a.city }}, {{ a.country }}</td>
+              <td class="num strong">{{ eurFull(a.marketValue) }}</td>
+              <td class="num">{{ eurFull(a.forcedSaleValue) }}</td>
+              <td class="num">
+                @if (a.contractLtv == null) { <span class="muted">—</span> }
+                @else if (a.contractLtv > 1) { <span class="pill critical">{{ pct(a.contractLtv) }}</span> }
+                @else { {{ pct(a.contractLtv) }} }
+              </td>
+              <td class="num" [class.warn-text]="a.daysPastDue >= 30">{{ a.daysPastDue }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7" class="empty-state">No assets match these filters.</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pager">
+      <span class="muted small num">Rows {{ int(firstRow()) }}–{{ int(lastRow()) }} of {{ int(total()) }}</span>
+      <button type="button" class="btn" [disabled]="page() <= 1" (click)="page.set(page() - 1)">Previous</button>
+      <span class="small num">Page {{ int(page()) }} of {{ int(pages()) }}</span>
+      <button type="button" class="btn" [disabled]="page() >= pages()" (click)="page.set(page() + 1)">Next</button>
+    </div>
+  </section>
+
+  @if (detail(); as d) {
+    <aside class="card detail" aria-label="Asset detail">
+      <div class="detail-head">
+        <div>
+          <span class="crumb">{{ humanize(d.asset.assetClass) }} · {{ d.asset.category }}</span>
+          <h2 class="detail-title">{{ d.asset.manufacturer }} {{ d.asset.model }}</h2>
+          <span class="mono muted">{{ d.asset.serialNumber }} · built {{ d.asset.yearOfManufacture }} · {{ humanize(d.asset.condition) }} condition</span>
+        </div>
+        <button type="button" class="icon-btn" aria-label="Close detail" (click)="selected.set(null)"><app-icon name="close" [size]="16" [stroke]="2" /></button>
+      </div>
+
+      <div class="facts">
+        <div><span>Market value</span><strong class="num">{{ eurFull(d.asset.marketValue) }}</strong></div>
+        <div><span>Forced sale value</span><strong class="num">{{ eurFull(d.asset.forcedSaleValue) }}</strong></div>
+        <div><span>Exposure (asset share)</span><strong class="num">{{ eurFull(d.assetExposure) }}</strong></div>
+        <div><span>Original cost</span><strong class="num">{{ eurFull(d.originalCost) }}</strong></div>
+      </div>
+
+      <div class="detail-section">
+        <div class="card-head">
+          <h3>Valuation history</h3>
+          <div class="legend">
+            <span><span class="swatch exposure"></span>Market</span>
+            <span><span class="swatch collateral"></span>Forced sale</span>
+            <span><span class="swatch dashed"></span>Exposure</span>
+          </div>
+        </div>
+        @if (valuationChart(); as cfg) {
+          <app-chart [config]="cfg" [height]="220" label="Market value, forced sale value and exposure over time" />
+        } @else {
+          <p class="muted">Only the purchase valuation exists so far; history appears after the first revaluation.</p>
+        }
+        @if (d.cover != null && d.asset.status !== 'Sold') {
+          <p class="card-foot">
+            Collateral cover: market value is {{ pct(d.cover) }} of this asset's exposure (forced sale {{ pct(d.forcedCover!) }}).
+            @if (d.forcedCover! < 1) { A forced sale today would leave a shortfall of {{ eurFull(d.assetExposure - d.asset.forcedSaleValue) }}. }
+          </p>
+        }
+      </div>
+
+      <dl class="kv">
+        <div><dt>Contract</dt><dd>{{ d.asset.contractNumber }} · {{ humanize(d.productType) }}, {{ d.termMonths }} months from {{ d.startDate | date: 'MMM y' }}</dd></div>
+        <div><dt>Contract exposure</dt><dd class="num">{{ eurFull(d.contractExposure) }} · {{ d.asset.daysPastDue }} days past due</dd></div>
+        <div><dt>Customer</dt><dd>{{ d.customerName }} · risk grade {{ d.customerRiskGrade }}</dd></div>
+        <div><dt>Vendor</dt><dd>{{ d.vendorName }}</dd></div>
+        <div><dt>Location</dt><dd>{{ d.asset.city }}, {{ d.asset.country }}</dd></div>
+        <div><dt>Last valued</dt><dd>{{ d.asset.lastValuedAt | date: 'd MMM y' }}</dd></div>
+      </dl>
+
+      <button type="button" class="btn" (click)="showContract(d.asset.contractNumber)">Show all assets on this contract</button>
+    </aside>
+  }
+</div>

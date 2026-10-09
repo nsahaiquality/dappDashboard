@@ -1,28 +1,36 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
-import { AssetExplorer } from './assets/asset-explorer';
-import { ApiService } from './core/api.service';
+import { Component, OnInit, inject } from '@angular/core';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { DashboardHubService } from './core/dashboard-hub.service';
-import { Dashboard } from './dashboard/dashboard';
+import { Icon } from './shared/icon';
 
+interface NavItem {
+  label: string;
+  icon: string;
+  link?: string;
+}
+
+/** Application shell: sidebar navigation (a top bar on narrow screens) around the routed page. */
 @Component({
   selector: 'app-root',
-  imports: [Dashboard, AssetExplorer, DatePipe],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon],
   templateUrl: './app.html',
 })
 export class App implements OnInit {
-  protected readonly hub = inject(DashboardHubService);
-  private readonly api = inject(ApiService);
+  private readonly hub = inject(DashboardHubService);
 
-  protected readonly tab = signal<'overview' | 'assets'>('overview');
-  protected readonly simulatorRunning = signal<boolean | null>(null);
+  protected readonly monitor: NavItem[] = [
+    { label: 'Overview', icon: 'overview', link: '/' },
+    { label: 'Assets', icon: 'assets', link: '/assets' },
+    { label: 'Remarketing', icon: 'remarketing' },
+    { label: 'Vendors', icon: 'vendors' },
+    { label: 'Refinancing', icon: 'refinancing' },
+  ];
+  protected readonly data: NavItem[] = [
+    { label: 'Sources', icon: 'sources' },
+    { label: 'Reports', icon: 'reports' },
+  ];
 
   ngOnInit() {
     this.hub.start();
-    this.api.getSimulator().subscribe({ next: (r) => this.simulatorRunning.set(r.running), error: () => {} });
-  }
-
-  protected toggleSimulator() {
-    this.api.setSimulator(!this.simulatorRunning()).subscribe((r) => this.simulatorRunning.set(r.running));
   }
 }

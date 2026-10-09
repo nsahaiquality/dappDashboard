@@ -1,34 +1,44 @@
-<header class="topbar">
-  <div class="brand">
-    <h1>Asset Portfolio Dashboard</h1>
-    <span class="muted small">Synthetic data · training exercise</span>
-  </div>
-  <nav class="tabs" aria-label="Views">
-    <button type="button" [class.active]="tab() === 'overview'" (click)="tab.set('overview')">Overview</button>
-    <button type="button" [class.active]="tab() === 'assets'" (click)="tab.set('assets')">Assets</button>
+<div class="shell">
+  <nav class="sidebar" aria-label="Main">
+    <a class="brand" routerLink="/">
+      <span class="brand-mark"><app-icon name="logo" [stroke]="2" /></span>
+      <span class="brand-text">
+        <span class="brand-name">Asset Portfolio</span>
+        <span class="brand-sub">Equipment finance</span>
+      </span>
+    </a>
+
+    <div class="nav-group">
+      <span class="nav-heading">Monitor</span>
+      @for (item of monitor; track item.label) {
+        @if (item.link) {
+          <a class="nav-item" [routerLink]="item.link" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" ariaCurrentWhenActive="page">
+            <app-icon [name]="item.icon" />{{ item.label }}
+          </a>
+        } @else {
+          <span class="nav-item disabled" aria-disabled="true">
+            <app-icon [name]="item.icon" />{{ item.label }}<span class="soon">Planned</span>
+          </span>
+        }
+      }
+    </div>
+
+    <div class="nav-group">
+      <span class="nav-heading">Data</span>
+      @for (item of data; track item.label) {
+        <span class="nav-item disabled" aria-disabled="true">
+          <app-icon [name]="item.icon" />{{ item.label }}<span class="soon">Planned</span>
+        </span>
+      }
+    </div>
+
+    <div class="sidebar-note">
+      <span class="sidebar-note-title">Synthetic dataset</span>
+      <span>Training exercise. Not affiliated with any company.</span>
+    </div>
   </nav>
-  <div class="topbar-right">
-    @if (hub.snapshot(); as s) {
-      <span class="muted small">Updated {{ s.generatedAt | date: 'HH:mm:ss' }}</span>
-    }
-    <span class="conn {{ hub.state() }}" role="status">
-      <span class="dot" aria-hidden="true"></span>{{ hub.state() }}
-    </span>
-    @if (simulatorRunning() !== null) {
-      <button type="button" class="btn" (click)="toggleSimulator()">
-        {{ simulatorRunning() ? 'Pause simulator' : 'Resume simulator' }}
-      </button>
-    }
-  </div>
-</header>
 
-<main>
-  @switch (tab()) {
-    @case ('overview') { <app-dashboard /> }
-    @case ('assets') { <app-asset-explorer /> }
-  }
-</main>
-
-<footer class="disclaimer">
-  Training exercise with fictional, randomly generated data. Not affiliated with any company.
-</footer>
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>

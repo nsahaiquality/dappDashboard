@@ -1,0 +1,195 @@
+<app-page-header title="Portfolio overview">
+  <button type="button" class="btn primary" (click)="exportCsv()" [disabled]="!s()">
+    <app-icon name="download" [size]="16" />Export
+  </button>
+</app-page-header>
+
+<app-filter-bar />
+
+@if (s(); as s) {
+  <div class="page-body" [class.pending]="hub.pending()">
+    <section class="kpi-grid" aria-label="Key figures">
+      @for (k of kpis(); track k.label) {
+        <div class="card kpi">
+          <span class="kpi-label">{{ k.label }}</span>
+          <span class="kpi-value">{{ k.value }}</span>
+          <div class="meter" aria-hidden="true">
+            @for (seg of k.bar; track $index) { <span class="seg {{ seg.tone }}" [style.width.%]="seg.pct"></span> }
+          </div>
+          <span class="kpi-sub">{{ k.sub }}</span>
+        </div>
+      }
+    </section>
+
+    <div class="row">
+      <section class="card grow-2">
+        <div class="card-head">
+          <div>
+            <h2>Exposure vs collateral by asset class</h2>
+            <p class="card-sub">Outstanding principal against current market value · select a class to filter</p>
+          </div>
+          <div class="legend">
+            <span><span class="swatch exposure"></span>Exposure</span>
+            <span><span class="swatch collateral"></span>Collateral value</span>
+          </div>
+        </div>
+        <div class="class-table">
+          <div class="class-row head" aria-hidden="true">
+            <span>Asset class</span><span></span><span class="num">LTV</span>
+          </div>
+          @for (c of classRows(); track c.assetClass) {
+            <button type="button" class="class-row" [class.selected]="c.selected" [attr.aria-pressed]="c.selected"
+              (click)="toggleClass(c.assetClass)" [title]="'Filter on ' + c.name">
+              <span class="class-name">{{ c.name }}<span class="muted small">{{ int(c.assets) }} assets</span></span>
+              <span class="bars">
+                <span class="bar-line"><span class="bar exposure" [style.width.%]="c.expPct"></span><span class="bar-val">{{ eur(c.exposure) }}</span></span>
+                <span class="bar-line"><span class="bar collateral" [style.width.%]="c.mktPct"></span><span class="bar-val">{{ eur(c.marketValue) }}</span></span>
+              </span>
+              <span class="num">
+                @if (c.underwater) {
+                  <span class="pill critical"><app-icon name="up" [size]="12" [stroke]="2.4" />{{ pct(c.loanToValue) }}</span>
+                } @else {
+                  {{ pct(c.loanToValue) }}
+                }
+              </span>
+            </button>
+          } @empty {
+            <p class="empty-state">No assets match these filters.</p>
+          }
+        </div>
+      </section>
+
+      <section class="card grow-1">
+        <div class="card-head">
+          <div>
+            <h2>Delinquency</h2>
+            <p class="card-sub">Past-due exposure {{ eur(pastDue().total) }} of {{ eur(s.totalExposure) }} ({{ pct(pastDue().share) }})</p>
+          </div>
+        </div>
+        <div class="stack-bar" role="img" [attr.aria-label]="'Composition of past-due exposure by bucket'">
+          @for (seg of pastDue().segments; track $index) { <span class="seg {{ seg.tone }}" [style.width.%]="seg.pct"></span> }
+        </div>
+        <table class="table compact">
+          <thead><tr><th>Bucket</th><th class="num">Contracts</th><th class="num">Exposure</th></tr></thead>
+          <tbody>
+            @for (b of buckets(); track b.bucket) {
+              <tr>
+                <td><span class="dot-label"><span class="swatch {{ b.tone }}"></span>{{ b.name }}</span></td>
+                <td class="num">{{ int(b.contracts) }}</td>
+                <td class="num strong">{{ eur(b.exposure) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        <a class="card-link" routerLink="/assets" [queryParams]="{ sort: 'DaysPastDue' }">
+          View {{ int(pastDue().contracts) }} past-due contracts<app-icon name="chevron" [size]="14" />
+        </a>
+      </section>
+    </div>
+
+    <div class="row">
+      <section class="card grow-1">
+        <div class="card-head">
+          <div>
+            <h2>Remarketing &amp; recovery</h2>
+            <p class="card-sub">Repossessed assets through to sale</p>
+          </div>
+        </div>
+        <div class="pipeline">
+          <div><span class="muted">Repossessed</span><strong>{{ int(s.remarketing.repossessed) }}</strong></div>
+          <div><span class="muted">Listed</span><strong>{{ int(s.remarketing.listed) }}</strong></div>
+          <div><span class="muted">Sold</span><strong>{{ int(s.remarketing.sold) }}</strong></div>
+        </div>
+        <div class="waterfall">
+          @for (r of recovery(); track r.label) {
+            <div class="waterfall-row">
+              <span class="muted">{{ r.label }}</span>
+              <span class="track"><span class="seg {{ r.tone }}" [style.width.%]="r.pct"></span></span>
+              <span class="num strong">{{ r.value }}</span>
+            </div>
+          }
+        </div>
+        <p class="card-foot">Net recovery {{ pct(s.remarketing.recoveryRate) }} of exposure at default · avg {{ s.remarketing.averageDaysToSell }} days from repossession to sale</p>
+      </section>
+
+      <section class="card grow-1">
+        <div class="card-head">
+          <div>
+            <h2>Top vendors by exposure</h2>
+            <p class="card-sub">Select a vendor to filter</p>
+          </div>
+        </div>
+        <div class="rank-list">
+          @for (v of vendors(); track v.vendorId) {
+            <button type="button" class="rank-item" [class.selected]="v.selected" [attr.aria-pressed]="v.selected" (click)="filters.toggle('vendorId', v.vendorId)">
+              <span class="rank-top"><span class="ellipsis">{{ v.name }}</span><span class="num strong">{{ eur(v.exposure) }}</span></span>
+              <span class="track thin"><span class="seg exposure" [style.width.%]="v.pct"></span></span>
+              <span class="muted small">{{ int(v.contracts) }} contracts</span>
+            </button>
+          } @empty {
+            <p class="empty-state">No vendors match these filters.</p>
+          }
+        </div>
+      </section>
+
+      <section class="card grow-1">
+        <div class="card-head">
+          <div>
+            <h2>Refinancing watchlist</h2>
+            <p class="card-sub">Asset classes where exposure exceeds collateral value</p>
+          </div>
+        </div>
+        <div class="watchlist">
+          @for (w of watchlist(); track w.assetClass) {
+            <button type="button" class="watch-item" (click)="toggleClass(w.assetClass)">
+              <span class="rank-top"><strong>{{ w.name }}</strong><span class="pill critical">LTV {{ pct(w.loanToValue) }}</span></span>
+              <span class="tabular">{{ eur(w.exposure) }} exposure vs {{ eur(w.marketValue) }} collateral (−{{ eur(w.gap) }})</span>
+              <span class="muted small">{{ w.why }}</span>
+            </button>
+          } @empty {
+            <p class="empty-state good">No asset class is underwater for this selection.</p>
+          }
+        </div>
+        <div class="card-section">
+          <span class="muted small">Collateral by country · select to filter</span>
+          <div class="chips">
+            @for (c of s.byCountry; track c.country) {
+              <button type="button" class="chip" [class.selected]="filters.filter().country === c.country" [attr.aria-pressed]="filters.filter().country === c.country"
+                (click)="filters.toggle('country', c.country)">{{ c.country }} <span class="num">{{ eur(c.marketValue) }}</span></button>
+            }
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card" aria-label="Live events">
+      <div class="card-head">
+        <div class="inline">
+          <h2>Live events</h2>
+          <span class="muted small">streamed from the portfolio{{ filters.filter().assetClass ? ' · ' + humanize(filters.filter().assetClass!) : '' }}</span>
+        </div>
+        <div class="segmented small" role="group" aria-label="Event category">
+          @for (c of categories; track c.id) {
+            <button type="button" [attr.aria-pressed]="category() === c.id" (click)="category.set(c.id)">{{ c.label }}</button>
+          }
+        </div>
+      </div>
+      <ol class="events" aria-live="polite">
+        @for (e of events(); track e) {
+          <li>
+            <time class="mono">{{ e.at | date: 'HH:mm:ss' }}</time>
+            <span class="pill {{ e.style.tone }}">{{ e.style.label }}</span>
+            <span class="event-text">{{ e.message }}</span>
+            <span class="num strong">{{ e.amountText }}</span>
+          </li>
+        } @empty {
+          <li class="empty-state">No events yet for this selection.</li>
+        }
+      </ol>
+    </section>
+  </div>
+} @else {
+  <div class="loading-state" role="status">
+    <span class="spinner" aria-hidden="true"></span>Loading portfolio snapshot…
+  </div>
+}
