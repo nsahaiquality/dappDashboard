@@ -47,6 +47,11 @@ SCRUM-49,T39,Task,"Containerise API and web (Dockerfiles), compose for full stac
 SCRUM-50,T40,Task,"Load test: 1M+ assets, snapshot latency and query plans",Add pg_trgm index for search; consider materialised views.,E6,asset-dashboard,To Do
 SCRUM-51,T41,Task,Deployment target decision (Azure App Service / AKS / on-prem IIS),,E6,asset-dashboard,To Do
 SCRUM-52,T42,Task,End-to-end verification against local Postgres and fixes,Run full stack locally; fix issues found.,E3,asset-dashboard,Done
-SCRUM-53,T43,Task,Professional BI dashboard redesign (UI/UX),Redesign to industry-leading BI standard; design canvas + implementation.,E4,asset-dashboard ui-ux,In Progress
-SCRUM-54,T44,Subtask,"Backend: global filters, per-filter SignalR snapshots, asset LTV/sort/export, exposure history",,T43,asset-dashboard ui-ux,Done
-SCRUM-55,T45,Subtask,Frontend: implement approved redesign in Angular,,T43,asset-dashboard ui-ux,Done
+SCRUM-53,E7,Epic,Professional BI dashboard redesign (UI/UX),Redesign to industry-leading BI standard; design canvas + implementation.,,asset-dashboard ui-ux,In Progress
+SCRUM-56,T46,Task,Design: redesign proposal on Claude Design canvas,,E7,asset-dashboard ui-ux,Done
+SCRUM-57,T47,Task,Implement redesign: backend,,E7,asset-dashboard ui-ux,Done
+SCRUM-58,T48,Task,Implement redesign: frontend,,E7,asset-dashboard ui-ux,Done
+SCRUM-59,T49,Task,Accessibility audit (WCAG AA),,E7,asset-dashboard ui-ux,To Do
+SCRUM-60,T50,Task,Measure dashboard performance at scale,,E7,asset-dashboard ui-ux,To Do
+SCRUM-54,T44,Subtask,"Backend: global filters, per-filter SignalR snapshots, asset LTV/sort/export, exposure history",,T47,asset-dashboard ui-ux,Done
+SCRUM-55,T45,Subtask,Frontend: implement approved redesign in Angular,,T48,asset-dashboard ui-ux,Done
