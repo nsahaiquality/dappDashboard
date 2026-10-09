@@ -1,0 +1,16 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+
+# Node / Angular (see also web/.gitignore)
+node_modules/
+dist/
+.angular/
+
+# OS / editors
+.DS_Store
+.idea/

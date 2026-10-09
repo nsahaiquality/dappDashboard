@@ -1,0 +1,34 @@
+<header class="topbar">
+  <div class="brand">
+    <h1>Asset Portfolio Dashboard</h1>
+    <span class="muted small">Synthetic data · training exercise</span>
+  </div>
+  <nav class="tabs" aria-label="Views">
+    <button type="button" [class.active]="tab() === 'overview'" (click)="tab.set('overview')">Overview</button>
+    <button type="button" [class.active]="tab() === 'assets'" (click)="tab.set('assets')">Assets</button>
+  </nav>
+  <div class="topbar-right">
+    @if (hub.snapshot(); as s) {
+      <span class="muted small">Updated {{ s.generatedAt | date: 'HH:mm:ss' }}</span>
+    }
+    <span class="conn {{ hub.state() }}" role="status">
+      <span class="dot" aria-hidden="true"></span>{{ hub.state() }}
+    </span>
+    @if (simulatorRunning() !== null) {
+      <button type="button" class="btn" (click)="toggleSimulator()">
+        {{ simulatorRunning() ? 'Pause simulator' : 'Resume simulator' }}
+      </button>
+    }
+  </div>
+</header>
+
+<main>
+  @switch (tab()) {
+    @case ('overview') { <app-dashboard /> }
+    @case ('assets') { <app-asset-explorer /> }
+  }
+</main>
+
+<footer class="disclaimer">
+  Training exercise with fictional, randomly generated data. Not affiliated with any company.
+</footer>
