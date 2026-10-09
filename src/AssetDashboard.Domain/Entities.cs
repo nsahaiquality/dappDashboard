@@ -123,3 +123,29 @@ public class RemarketingCase
     /// <summary>Repossession, transport, storage, refurbishment and auction fees.</summary>
     public decimal RecoveryCosts { get; set; }
 }
+
+/// <summary>
+/// One day of portfolio figures, for the whole portfolio (<see cref="AssetClass"/> null) or one asset class.
+/// Older rows are a synthetic backfill; from the first run onwards a background job captures today's row.
+/// </summary>
+public class PortfolioHistoryPoint
+{
+    public long Id { get; set; }
+    public DateOnly Date { get; set; }
+    public AssetClass? AssetClass { get; set; }
+
+    public int OpenContracts { get; set; }
+    public int ActiveAssets { get; set; }
+    public decimal Exposure { get; set; }
+    public decimal MarketValue { get; set; }
+    public decimal ForcedSaleValue { get; set; }
+    /// <summary>Exposure on contracts 30+ days past due.</summary>
+    public decimal ExposureAtRisk { get; set; }
+    /// <summary>Exposure on contracts 90+ days past due (defaulted).</summary>
+    public decimal DefaultedExposure { get; set; }
+    /// <summary>Net remarketing proceeds (sale price − costs) booked that day.</summary>
+    public decimal NetRecoveries { get; set; }
+
+    /// <summary>True for generated history, false for figures captured from the live portfolio.</summary>
+    public bool IsBackfilled { get; set; }
+}

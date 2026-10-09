@@ -11,6 +11,7 @@ public class AssetDbContext(DbContextOptions<AssetDbContext> options) : DbContex
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<AssetValuation> AssetValuations => Set<AssetValuation>();
     public DbSet<RemarketingCase> RemarketingCases => Set<RemarketingCase>();
+    public DbSet<PortfolioHistoryPoint> PortfolioHistory => Set<PortfolioHistoryPoint>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -71,6 +72,13 @@ public class AssetDbContext(DbContextOptions<AssetDbContext> options) : DbContex
             e.HasIndex(x => x.AssetId).IsUnique();
             e.HasIndex(x => x.Status);
             e.HasOne(x => x.Asset).WithOne(x => x.RemarketingCase).HasForeignKey<RemarketingCase>(x => x.AssetId);
+        });
+
+        b.Entity<PortfolioHistoryPoint>(e =>
+        {
+            // One row per day for the total (null class) and per class; NULLS NOT DISTINCT makes the total unique too.
+            e.Property(x => x.AssetClass).HasConversion<string>().HasMaxLength(32);
+            e.HasIndex(x => new { x.Date, x.AssetClass }).IsUnique().AreNullsDistinct(false);
         });
     }
 }

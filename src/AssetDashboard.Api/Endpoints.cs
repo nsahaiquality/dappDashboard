@@ -3,6 +3,7 @@ using System.Text;
 using AssetDashboard.Api.RealTime;
 using AssetDashboard.Domain;
 using AssetDashboard.Infrastructure.Dashboard;
+using AssetDashboard.Infrastructure.History;
 using AssetDashboard.Infrastructure.Simulation;
 
 namespace AssetDashboard.Api;
@@ -20,6 +21,9 @@ public static class Endpoints
             broadcaster.Get(q.ToFilter()) ?? await stats.GetSnapshotAsync(q.ToFilter(), ct));
 
         api.MapGet("/dashboard/events", (SignalREventSink events) => events.Recent());
+
+        api.MapGet("/history", (PortfolioHistoryService history, AssetClass? assetClass, int days = 365, CancellationToken ct = default) =>
+            history.GetAsync(days, assetClass, ct));
 
         api.MapGet("/reference", (PortfolioStatsService stats, CancellationToken ct) => stats.GetReferenceDataAsync(ct));
 

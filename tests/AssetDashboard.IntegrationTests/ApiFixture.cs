@@ -15,9 +15,7 @@ public sealed class ApiFixture : IAsyncLifetime
 {
     public const int SeedContracts = 1_500;
 
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:17-alpine")
-        .Build();
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
 
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;
@@ -39,6 +37,7 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("Seed:Contracts", SeedContracts.ToString());
             b.UseSetting("Seed:RandomSeed", "7");
             b.UseSetting("Simulator:Enabled", "false");
+            b.UseSetting("History:BackfillDays", "120");
         });
         Client = Factory.CreateClient();
     }
