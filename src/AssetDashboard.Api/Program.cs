@@ -41,8 +41,25 @@ builder.Services.AddHostedService<HistoryRecorder>();
 
 builder.Services.AddSignalR()
     .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-builder.Services.AddOpenApi();
+builder.Services.ConfigureHttpJsonOptions(o =>
+{
+    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    // Numbers are numbers (the web default also accepts strings, which makes the OpenAPI schema "number or string").
+    o.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
+});
+builder.Services.AddOpenApi(o => o.AddDocumentTransformer((document, _, _) =>
+{
+    document.Info = new()
+    {
+        Title = "Asset Portfolio Dashboard API",
+        Version = "v1",
+        Description = "Read API behind the asset portfolio dashboard: portfolio snapshot, assets, history, refinancing, " +
+                      "remarketing, vendors and data sources. Live updates are pushed over SignalR at /hubs/dashboard " +
+                      "(server messages 'Snapshot' and 'PortfolioEvent'; client method 'SetFilter'). " +
+                      "Training exercise on synthetic data; not related to any business.",
+    };
+    return Task.CompletedTask;
+}));
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
@@ -64,8 +81,20 @@ if (app.Configuration.GetValue("Database:MigrateOnStartup", false))
     }
 }
 
-if (app.Environment.IsDevelopment())
+// Interactive API documentation: /openapi/v1.json (OpenAPI document) and /swagger (Swagger UI); on unless ApiDocs:Enabled=false.
+if (app.Configuration.GetValue("ApiDocs:Enabled", true))
+{
     app.MapOpenApi();
+    app.UseSwaggerUI(o =>
+    {
+        o.SwaggerEndpoint("/openapi/v1.json", "Asset Portfolio Dashboard API v1");
+        o.RoutePrefix = "swagger";
+        o.DocumentTitle = "Asset Portfolio Dashboard API";
+        o.DisplayRequestDuration();
+        o.EnableTryItOutByDefault();
+    });
+    app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+}
 
 app.MapHealthChecks("/health");
 app.MapDashboardApi();

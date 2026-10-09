@@ -24,10 +24,13 @@ public sealed record PortfolioSnapshot(
     // The filter this snapshot was computed for.
     PortfolioFilter Filter);
 
+/// <summary>Exposure and collateral of one asset class; LoanToValue = exposure ÷ market value.</summary>
 public sealed record AssetClassStat(AssetClass AssetClass, int Assets, decimal MarketValue, decimal Exposure, decimal LoanToValue);
 
+/// <summary>Contracts and exposure in one days-past-due bucket.</summary>
 public sealed record DelinquencyBucket(string Bucket, int Contracts, decimal Exposure);
 
+/// <summary>Repossession pipeline counts and recovery on sold assets.</summary>
 public sealed record RemarketingStat(
     int Repossessed,
     int Listed,
@@ -39,8 +42,10 @@ public sealed record RemarketingStat(
     decimal RecoveryRate,
     double AverageDaysToSell);
 
+/// <summary>A vendor ranked by exposure on open contracts.</summary>
 public sealed record VendorStat(int VendorId, string Name, int Contracts, decimal Exposure);
 
+/// <summary>Active assets and their market value in one country.</summary>
 public sealed record CountryStat(string Country, int Assets, decimal MarketValue);
 
 public enum PortfolioEventType
@@ -72,6 +77,7 @@ public sealed record PortfolioEvent(
     long? AssetId = null,
     decimal? Amount = null);
 
+/// <summary>One financed asset as listed in the asset explorer.</summary>
 public sealed record AssetListItem(
     long Id, string SerialNumber, AssetClass AssetClass, string Category, string Manufacturer, string Model,
     int YearOfManufacture, AssetStatus Status, AssetCondition Condition, string Country, string City,
@@ -80,15 +86,20 @@ public sealed record AssetListItem(
     decimal? ContractLtv);
 
 // ExposureShare: this asset's share of the contract balance at that date (from the amortisation schedule).
+/// <summary>One valuation of an asset, with the asset's share of the contract balance at that date.</summary>
 public sealed record ValuationPoint(DateTime ValuedAt, decimal MarketValue, decimal ForcedSaleValue, ValuationMethod Method,
     decimal ExposureShare);
 
+/// <summary>One asset with its contract, customer, vendor and valuation history.</summary>
 public sealed record AssetDetail(AssetListItem Asset, decimal OriginalCost, decimal ContractExposure, decimal AssetExposure,
     ProductType ProductType, int TermMonths, DateOnly StartDate,
     string CustomerName, int CustomerRiskGrade, string VendorName, IReadOnlyList<ValuationPoint> Valuations);
 
+/// <summary>A vendor for filter dropdowns.</summary>
 public sealed record VendorOption(int Id, string Name, AssetClass AssetClass);
 
+/// <summary>Values for the filter dropdowns.</summary>
 public sealed record ReferenceData(IReadOnlyList<VendorOption> Vendors, IReadOnlyList<string> Countries);
 
+/// <summary>One page of results; Total counts all matching rows.</summary>
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);

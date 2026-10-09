@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AssetDashboard.Infrastructure.Refinancing;
 
+/// <summary>Refinancing pipeline, expected loss and maturity wall for the filtered portfolio.</summary>
 public sealed record RefinancingSummary(
     int Submitted,
     int UnderReview,
@@ -21,13 +22,16 @@ public sealed record RefinancingSummary(
     IReadOnlyList<ReasonStat> ByReason,
     PortfolioFilter Filter);
 
+/// <summary>Exposure and expected loss (PD × LGD × exposure) of one asset class.</summary>
 public sealed record ExpectedLossByClass(AssetClass AssetClass, decimal Exposure, decimal ExpectedLoss);
 
 /// <summary>Exposure on contracts maturing in a quarter, and the balloon / residual amounts due then.</summary>
 public sealed record MaturityQuarter(int Year, int Quarter, int Contracts, decimal Exposure, decimal BalloonDue);
 
+/// <summary>Requests and decisions for one refinancing reason.</summary>
 public sealed record ReasonStat(RefinancingReason Reason, int Requests, int Approved, int Declined);
 
+/// <summary>A refinancing request with the risk picture at request time and the decision.</summary>
 public sealed record RefinancingRequestItem(
     long Id, long ContractId, string ContractNumber, string CustomerName, AssetClass AssetClass,
     DateTime RequestedAt, RefinancingReason Reason, decimal RequestedAmount, int RequestedTermMonths,

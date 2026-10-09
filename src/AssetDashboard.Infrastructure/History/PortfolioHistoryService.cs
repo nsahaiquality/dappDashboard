@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AssetDashboard.Infrastructure.History;
 
+/// <summary>Portfolio figures on one day; IsBackfilled marks generated history.</summary>
 public sealed record HistoryPoint(
     DateOnly Date,
     int OpenContracts,

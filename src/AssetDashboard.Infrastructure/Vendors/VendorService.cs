@@ -13,6 +13,7 @@ public enum VendorSort
     TargetAttainment,
 }
 
+/// <summary>A vendor programme: terms, exposure, risk and origination against target.</summary>
 public sealed record VendorPerformance(
     int Id, string Name, string Country, AssetClass AssetClass, VendorProgramType ProgramType, RecourseType Recourse, string Rating,
     DateOnly OnboardedOn, int Contracts, int OpenContracts, decimal Exposure, decimal MarketValue, decimal LoanToValue,
@@ -23,10 +24,13 @@ public sealed record VendorPerformance(
     decimal AnnualVolumeTarget,
     decimal TargetAttainment);
 
+/// <summary>New contracts and financed amount in one month.</summary>
 public sealed record MonthlyOrigination(int Year, int Month, int Contracts, decimal Financed);
 
+/// <summary>Contracts and exposure in one category (asset class, product or customer).</summary>
 public sealed record VendorMix(string Key, int Contracts, decimal Exposure);
 
+/// <summary>One vendor with origination history, mixes, delinquency and top customers.</summary>
 public sealed record VendorDetail(
     VendorPerformance Performance,
     IReadOnlyList<MonthlyOrigination> Origination,

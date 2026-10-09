@@ -14,11 +14,13 @@ public enum Freshness
     Stale,
 }
 
+/// <summary>An upstream source system with its latest load, freshness and reliability.</summary>
 public sealed record SourceStatus(
     int Id, string Name, SourceKind Kind, string Owner, string Description, int ExpectedIntervalMinutes,
     DateTime? LastRunAt, LoadStatus? LastStatus, string? LastMessage, DateTime? LastSuccessAt, double? MinutesSinceSuccess,
     Freshness Freshness, int Runs7Days, decimal SuccessRate7Days, long RowsRead24Hours, double AverageDurationSeconds7Days);
 
+/// <summary>One load from a source system.</summary>
 public sealed record LoadRunItem(long Id, DateTime StartedAt, DateTime FinishedAt, double DurationSeconds, LoadStatus Status,
     int RowsRead, int RowsRejected, string? Message);
 

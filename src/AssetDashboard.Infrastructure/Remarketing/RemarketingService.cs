@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AssetDashboard.Infrastructure.Remarketing;
 
+/// <summary>Recovery pipeline, stock ageing, recovery rates, costs and upcoming auctions.</summary>
 public sealed record RemarketingSummary(
     int Repossessed,
     int Listed,
@@ -20,21 +21,27 @@ public sealed record RemarketingSummary(
     IReadOnlyList<AuctionItem> UpcomingAuctions,
     PortfolioFilter Filter);
 
+/// <summary>Unsold repossessed stock by days since repossession.</summary>
 public sealed record AgeingBucket(string Bucket, int Cases, decimal ForcedSaleValue, decimal AccruedCosts);
 
+/// <summary>Sales and recovery through one channel in the last 12 months.</summary>
 public sealed record ChannelRecovery(RemarketingChannel Channel, int Sold, decimal Proceeds, decimal Costs, decimal ExposureAtDefault,
     decimal RecoveryRate, double AverageDaysToSell);
 
+/// <summary>Sales and recovery for one asset class in the last 12 months.</summary>
 public sealed record ClassRecovery(AssetClass AssetClass, int Sold, decimal RecoveryRate, double AverageDaysToSell);
 
+/// <summary>Remarketing costs by type.</summary>
 public sealed record CostBreakdown(decimal Transport, decimal Storage, decimal Refurbishment, decimal SellingFees)
 {
     public decimal Total => Transport + Storage + Refurbishment + SellingFees;
 }
 
+/// <summary>An auction with lot statistics; SellThrough = sold ÷ (sold + passed in).</summary>
 public sealed record AuctionItem(int Id, string Name, RemarketingChannel Channel, DateOnly Date, string Location, AuctionStatus Status,
     int Lots, int LotsSold, int LotsPassedIn, decimal HammerTotal, decimal ReserveTotal, double AverageBids, decimal SellThrough);
 
+/// <summary>A repossessed asset on its way to sale, with costs and recovery.</summary>
 public sealed record RemarketingCaseItem(
     long Id, long AssetId, string SerialNumber, string Category, AssetClass AssetClass, string Country, string? Yard,
     RemarketingStatus Status, RemarketingChannel Channel, DateOnly RepossessedOn, DateOnly? ListedOn, DateOnly? SoldOn, int DaysInStock,
