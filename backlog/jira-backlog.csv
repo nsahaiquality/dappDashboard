@@ -1,48 +1,48 @@
-Issue ID,Issue Type,Summary,Description,Parent,Labels,Status
-E1,Epic,Development environment & project setup,"Repo, solution structure, local Postgres in Docker, tooling on macOS, Windows VM for client-only tools.",,asset-dashboard,To Do
-T1,Task,Create solution structure (.NET 10: Domain / Infrastructure / Api / Tests),Clean layering; Domain has no dependencies.,E1,asset-dashboard,Done
-T2,Task,Scaffold Angular 22 frontend with dev proxy to API,Proxy /api and /hubs (WebSocket) to http://localhost:5080.,E1,asset-dashboard,Done
-T3,Task,Docker Compose for PostgreSQL (+ optional pgAdmin),docker compose up -d,E1,asset-dashboard,Done
-T4,Task,Install a Docker runtime on macOS (Docker Desktop / OrbStack / Colima),Needed to run Postgres locally.,E1,asset-dashboard,To Do
-T5,Task,Set up Windows 11 ARM VM (VMware Fusion / Parallels) for client-only tooling,Only if the client requires Windows-only tools; prefer a client-provided Cloud PC/VDI.,E1,asset-dashboard,To Do
-T6,Task,"README with disclaimer, run instructions and configuration",,E1,asset-dashboard,Done
-E2,Epic,Domain model & synthetic asset database,Realistic vendor-finance data model and deterministic synthetic portfolio while access to the real database is pending.,,asset-dashboard,To Do
-T7,Task,"Define entities: Vendor, Customer, Contract, Asset, AssetValuation, RemarketingCase",See docs/domain-model.md.,E2,asset-dashboard,Done
-T8,Task,"Implement valuation model (depreciation curves, condition, market index, forced sale value)",ValuationModel.cs; unit tested.,E2,asset-dashboard,Done
-T9,Task,Implement amortisation maths (annuity with balloon/residual),Amortization.cs; unit tested.,E2,asset-dashboard,Done
-T10,Task,"Build deterministic portfolio generator (contracts, assets, valuations, defaults, auctions)","PortfolioGenerator.cs; seed-based, about 20k contracts by default.",E2,asset-dashboard,Done
-T11,Task,"EF Core mapping, indexes and initial migration",,E2,asset-dashboard,Done
-T12,Task,Validate synthetic distributions with domain experts once client data model is known,"Compare LTV, default rate, recovery rate, depreciation per class.",E2,asset-dashboard,To Do
-T13,Task,Fast bulk seeding via Npgsql binary COPY for 1M+ rows,Current batched SaveChanges is fine up to about 200k contracts.,E2,asset-dashboard,To Do
-E3,Epic,Backend API & real-time communication,ASP.NET Core minimal API and SignalR hub pushing portfolio changes to clients.,,asset-dashboard,To Do
-T14,Task,Portfolio statistics service (SQL-side aggregation),"KPIs, by class, delinquency buckets, vendors, countries, remarketing.",E3,asset-dashboard,Done
-T15,Task,"SignalR DashboardHub with typed client (Snapshot, PortfolioEvent)",,E3,asset-dashboard,Done
-T16,Task,"Throttled snapshot broadcaster (coalesce changes, max 1 recompute/s)",,E3,asset-dashboard,Done
-T17,Task,"Market simulator background service (revaluations, payments, defaults, auctions, shocks)",Can be paused or resumed via /api/simulator.,E3,asset-dashboard,Done
-T18,Task,"REST endpoints: assets (paged, filtered), asset detail, snapshot, events",,E3,asset-dashboard,Done
-T19,Task,Integration tests against real Postgres (Testcontainers),Verifies EF query translation of the stats queries.,E3,asset-dashboard,To Do
-T20,Task,"Authentication & authorisation (Entra ID / OIDC), secure hub",Likely Microsoft Entra ID given a Windows-centric client.,E3,asset-dashboard,To Do
-T21,Task,SignalR scale-out (Redis backplane or Azure SignalR Service),Needed for more than one API instance.,E3,asset-dashboard,To Do
-T22,Task,"Structured logging, metrics and tracing (OpenTelemetry)",,E3,asset-dashboard,To Do
-E4,Epic,Frontend dashboard (Angular),Real-time viewer for portfolio statistics and asset drill-down.,,asset-dashboard,To Do
-T23,Task,SignalR client service with auto-reconnect and connection status,,E4,asset-dashboard,Done
-T24,Task,"KPI tiles (exposure, collateral, LTV, at-risk, shortfall, recovery)",,E4,asset-dashboard,Done
-T25,Task,"Charts: exposure vs collateral by class, delinquency, country","Chart.js, colour-blind-safe palette, dark mode.",E4,asset-dashboard,Done
-T26,Task,Live event feed,,E4,asset-dashboard,Done
-T27,Task,"Asset explorer with filters, paging and valuation history",,E4,asset-dashboard,Done
-T28,Task,"Filters on the overview (asset class, country, vendor) driving all widgets",Requires filter parameters on the snapshot (per-client groups in SignalR).,E4,asset-dashboard,To Do
-T29,Task,"Trend charts over time (exposure, LTV, defaults per day)",Needs a daily snapshot history table.,E4,asset-dashboard,To Do
-T30,Task,"Refinancing view: per contract LTV, FSV coverage, indicative risk",Supports refinancing and risk pricing decisions.,E4,asset-dashboard,To Do
-T31,Task,Frontend unit tests (Vitest) and e2e tests (Playwright),,E4,asset-dashboard,To Do
-E5,Epic,Integration with client asset database,Replace the simulator with the client's real data once access is granted.,,asset-dashboard,To Do
-T32,Task,"Obtain access, schema documentation and data dictionary of the asset database",Blocked: waiting for client access.,E5,asset-dashboard,To Do
-T33,Task,Map client schema to dashboard read model,,E5,asset-dashboard,To Do
-T34,Task,"Choose change feed: CDC (Debezium/SQL Server CDC), domain events, LISTEN/NOTIFY or polling","See docs/architecture.md, section 'From simulator to real data'.",E5,asset-dashboard,To Do
-T35,Task,Implement change-feed consumer publishing to IPortfolioEventSink,,E5,asset-dashboard,To Do
-T36,Task,Initial load / backfill and reconciliation checks,,E5,asset-dashboard,To Do
-T37,Task,"Data protection review (PII in customer data, GDPR)",,E5,asset-dashboard,To Do
-E6,Epic,"Quality, DevOps & performance","CI/CD, code quality, and behaviour at the client's data volumes.",,asset-dashboard,To Do
-T38,Task,"CI pipeline: build, test, lint for backend and frontend","GitHub Actions or Azure DevOps, depending on client standard.",E6,asset-dashboard,To Do
-T39,Task,"Containerise API and web (Dockerfiles), compose for full stack",,E6,asset-dashboard,To Do
-T40,Task,"Load test: 1M+ assets, snapshot latency and query plans",Add pg_trgm index for search; consider materialised views.,E6,asset-dashboard,To Do
-T41,Task,Deployment target decision (Azure App Service / AKS / on-prem IIS),,E6,asset-dashboard,To Do
+Jira Key,Issue ID,Issue Type,Summary,Description,Parent,Labels,Status
+SCRUM-5,E1,Epic,Development environment & project setup,"Repo, solution structure, local Postgres in Docker, tooling on macOS, Windows VM for client-only tools.",,asset-dashboard,To Do
+SCRUM-6,T1,Task,Create solution structure (.NET 10: Domain / Infrastructure / Api / Tests),Clean layering; Domain has no dependencies.,E1,asset-dashboard,Done
+SCRUM-7,T2,Task,Scaffold Angular 22 frontend with dev proxy to API,Proxy /api and /hubs (WebSocket) to http://localhost:5080.,E1,asset-dashboard,Done
+SCRUM-8,T3,Task,Docker Compose for PostgreSQL (+ optional pgAdmin),docker compose up -d,E1,asset-dashboard,Done
+SCRUM-9,T4,Task,Install a Docker runtime on macOS (Docker Desktop / OrbStack / Colima),Needed to run Postgres locally.,E1,asset-dashboard,To Do
+SCRUM-10,T5,Task,Set up Windows 11 ARM VM (VMware Fusion / Parallels) for client-only tooling,Only if the client requires Windows-only tools; prefer a client-provided Cloud PC/VDI.,E1,asset-dashboard,To Do
+SCRUM-11,T6,Task,"README with disclaimer, run instructions and configuration",,E1,asset-dashboard,Done
+SCRUM-12,E2,Epic,Domain model & synthetic asset database,Realistic vendor-finance data model and deterministic synthetic portfolio while access to the real database is pending.,,asset-dashboard,To Do
+SCRUM-13,T7,Task,"Define entities: Vendor, Customer, Contract, Asset, AssetValuation, RemarketingCase",See docs/domain-model.md.,E2,asset-dashboard,Done
+SCRUM-14,T8,Task,"Implement valuation model (depreciation curves, condition, market index, forced sale value)",ValuationModel.cs; unit tested.,E2,asset-dashboard,Done
+SCRUM-15,T9,Task,Implement amortisation maths (annuity with balloon/residual),Amortization.cs; unit tested.,E2,asset-dashboard,Done
+SCRUM-16,T10,Task,"Build deterministic portfolio generator (contracts, assets, valuations, defaults, auctions)","PortfolioGenerator.cs; seed-based, about 20k contracts by default.",E2,asset-dashboard,Done
+SCRUM-17,T11,Task,"EF Core mapping, indexes and initial migration",,E2,asset-dashboard,Done
+SCRUM-18,T12,Task,Validate synthetic distributions with domain experts once client data model is known,"Compare LTV, default rate, recovery rate, depreciation per class.",E2,asset-dashboard,To Do
+SCRUM-19,T13,Task,Fast bulk seeding via Npgsql binary COPY for 1M+ rows,Current batched SaveChanges is fine up to about 200k contracts.,E2,asset-dashboard,To Do
+SCRUM-20,E3,Epic,Backend API & real-time communication,ASP.NET Core minimal API and SignalR hub pushing portfolio changes to clients.,,asset-dashboard,To Do
+SCRUM-21,T14,Task,Portfolio statistics service (SQL-side aggregation),"KPIs, by class, delinquency buckets, vendors, countries, remarketing.",E3,asset-dashboard,Done
+SCRUM-22,T15,Task,"SignalR DashboardHub with typed client (Snapshot, PortfolioEvent)",,E3,asset-dashboard,Done
+SCRUM-23,T16,Task,"Throttled snapshot broadcaster (coalesce changes, max 1 recompute/s)",,E3,asset-dashboard,Done
+SCRUM-24,T17,Task,"Market simulator background service (revaluations, payments, defaults, auctions, shocks)",Can be paused or resumed via /api/simulator.,E3,asset-dashboard,Done
+SCRUM-25,T18,Task,"REST endpoints: assets (paged, filtered), asset detail, snapshot, events",,E3,asset-dashboard,Done
+SCRUM-26,T19,Task,Integration tests against real Postgres (Testcontainers),Verifies EF query translation of the stats queries.,E3,asset-dashboard,To Do
+SCRUM-27,T20,Task,"Authentication & authorisation (Entra ID / OIDC), secure hub",Likely Microsoft Entra ID given a Windows-centric client.,E3,asset-dashboard,To Do
+SCRUM-28,T21,Task,SignalR scale-out (Redis backplane or Azure SignalR Service),Needed for more than one API instance.,E3,asset-dashboard,To Do
+SCRUM-29,T22,Task,"Structured logging, metrics and tracing (OpenTelemetry)",,E3,asset-dashboard,To Do
+SCRUM-30,E4,Epic,Frontend dashboard (Angular),Real-time viewer for portfolio statistics and asset drill-down.,,asset-dashboard,To Do
+SCRUM-31,T23,Task,SignalR client service with auto-reconnect and connection status,,E4,asset-dashboard,Done
+SCRUM-32,T24,Task,"KPI tiles (exposure, collateral, LTV, at-risk, shortfall, recovery)",,E4,asset-dashboard,Done
+SCRUM-33,T25,Task,"Charts: exposure vs collateral by class, delinquency, country","Chart.js, colour-blind-safe palette, dark mode.",E4,asset-dashboard,Done
+SCRUM-34,T26,Task,Live event feed,,E4,asset-dashboard,Done
+SCRUM-35,T27,Task,"Asset explorer with filters, paging and valuation history",,E4,asset-dashboard,Done
+SCRUM-36,T28,Task,"Filters on the overview (asset class, country, vendor) driving all widgets",Requires filter parameters on the snapshot (per-client groups in SignalR).,E4,asset-dashboard,To Do
+SCRUM-37,T29,Task,"Trend charts over time (exposure, LTV, defaults per day)",Needs a daily snapshot history table.,E4,asset-dashboard,To Do
+SCRUM-38,T30,Task,"Refinancing view: per contract LTV, FSV coverage, indicative risk",Supports refinancing and risk pricing decisions.,E4,asset-dashboard,To Do
+SCRUM-39,T31,Task,Frontend unit tests (Vitest) and e2e tests (Playwright),,E4,asset-dashboard,To Do
+SCRUM-40,E5,Epic,Integration with client asset database,Replace the simulator with the client's real data once access is granted.,,asset-dashboard,To Do
+SCRUM-41,T32,Task,"Obtain access, schema documentation and data dictionary of the asset database",Blocked: waiting for client access.,E5,asset-dashboard,To Do
+SCRUM-42,T33,Task,Map client schema to dashboard read model,,E5,asset-dashboard,To Do
+SCRUM-43,T34,Task,"Choose change feed: CDC (Debezium/SQL Server CDC), domain events, LISTEN/NOTIFY or polling","See docs/architecture.md, section 'From simulator to real data'.",E5,asset-dashboard,To Do
+SCRUM-44,T35,Task,Implement change-feed consumer publishing to IPortfolioEventSink,,E5,asset-dashboard,To Do
+SCRUM-45,T36,Task,Initial load / backfill and reconciliation checks,,E5,asset-dashboard,To Do
+SCRUM-46,T37,Task,"Data protection review (PII in customer data, GDPR)",,E5,asset-dashboard,To Do
+SCRUM-47,E6,Epic,"Quality, DevOps & performance","CI/CD, code quality, and behaviour at the client's data volumes.",,asset-dashboard,To Do
+SCRUM-48,T38,Task,"CI pipeline: build, test, lint for backend and frontend","GitHub Actions or Azure DevOps, depending on client standard.",E6,asset-dashboard,To Do
+SCRUM-49,T39,Task,"Containerise API and web (Dockerfiles), compose for full stack",,E6,asset-dashboard,To Do
+SCRUM-50,T40,Task,"Load test: 1M+ assets, snapshot latency and query plans",Add pg_trgm index for search; consider materialised views.,E6,asset-dashboard,To Do
+SCRUM-51,T41,Task,Deployment target decision (Azure App Service / AKS / on-prem IIS),,E6,asset-dashboard,To Do

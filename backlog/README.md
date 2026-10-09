@@ -1,5 +1,11 @@
 # Jira backlog
 
+The backlog lives in Jira (project **SCRUM**, label `asset-dashboard`). The `Jira Key` column in
+`jira-backlog.csv` maps each row to its ticket. Put the ticket key in commit messages (e.g.
+`SCRUM-26: add Testcontainers integration tests`) so Jira links commits to issues.
+
+The import instructions below are only needed to recreate the backlog in another Jira project.
+
 `jira-backlog.csv` contains 6 epics and 41 tasks. Tasks already completed in this repository are
 marked `Done`.
 
