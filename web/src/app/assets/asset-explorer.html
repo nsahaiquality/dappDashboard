@@ -73,7 +73,9 @@
       <div><dt>Vendor</dt><dd>{{ d.vendorName }}</dd></div>
       <div><dt>Last valued</dt><dd>{{ d.asset.lastValuedAt | date: 'mediumDate' }}</dd></div>
     </dl>
-    @if (valuationChart(); as cfg) {
+    @if (d.valuations.length < 2) {
+      <p class="muted">Only the purchase valuation exists so far; history appears after the first revaluation.</p>
+    } @else if (valuationChart(); as cfg) {
       <app-chart [config]="cfg" [height]="240" label="Valuation history of this asset" />
     }
   </aside>

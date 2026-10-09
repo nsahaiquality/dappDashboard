@@ -6,7 +6,7 @@ The backlog lives in Jira (project **SCRUM**, label `asset-dashboard`). The `Jir
 
 The import instructions below are only needed to recreate the backlog in another Jira project.
 
-`jira-backlog.csv` contains 6 epics and 41 tasks. Tasks already completed in this repository are
+`jira-backlog.csv` contains 6 epics and 42 tasks. Tasks already completed in this repository are
 marked `Done`.
 
 ## Importing into Jira Cloud

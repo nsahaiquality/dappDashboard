@@ -405,6 +405,9 @@ main {
     padding: 6px 0;
     border-bottom: 1px solid var(--grid);
   }
+  .status {
+    justify-self: start;
+  }
   time {
     font-variant-numeric: tabular-nums;
     color: var(--text-muted);

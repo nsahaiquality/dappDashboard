@@ -70,6 +70,13 @@ public class ValuationModelTests
     }
 
     [Fact]
+    public void Value_never_exceeds_original_cost()
+    {
+        foreach (var assetClass in Enum.GetValues<AssetClass>())
+            Assert.Equal(80_000m, ValuationModel.MarketValue(80_000, assetClass, 0.1, AssetCondition.Excellent, marketIndex: 1.2));
+    }
+
+    [Fact]
     public void Forced_sale_value_is_below_market_value()
     {
         foreach (var assetClass in Enum.GetValues<AssetClass>())

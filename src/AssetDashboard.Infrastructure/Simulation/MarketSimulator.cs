@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Globalization;
 
 namespace AssetDashboard.Infrastructure.Simulation;
 
@@ -76,7 +77,7 @@ public sealed class MarketSimulator(
 
         var before = asset.MarketValue;
         var drift = Math.Clamp(Normal(-0.004, 0.025), -0.12, 0.08);
-        asset.MarketValue = Math.Round(asset.MarketValue * (decimal)(1 + drift), 2);
+        asset.MarketValue = Math.Min(asset.OriginalCost, Math.Round(asset.MarketValue * (decimal)(1 + drift), 2));
         asset.ForcedSaleValue = ValuationModel.ForcedSaleValue(asset.MarketValue, asset.AssetClass);
         asset.LastValuedAt = DateTime.UtcNow;
         var method = _rng.NextDouble() < 0.1 ? ValuationMethod.PhysicalInspection : ValuationMethod.IndexBased;
@@ -218,7 +219,7 @@ public sealed class MarketSimulator(
 
         var recovery = @case.ExposureAtDefault == 0 ? 0 : (price - @case.RecoveryCosts) / @case.ExposureAtDefault;
         return new PortfolioEvent(DateTime.UtcNow, PortfolioEventType.Sold,
-            $"{asset.Category} {asset.SerialNumber} sold via {@case.Channel} for {Eur(price)} (recovery {recovery:P0})",
+            $"{asset.Category} {asset.SerialNumber} sold via {@case.Channel} for {Eur(price)} (recovery {recovery.ToString("P0", Culture)})",
             asset.AssetClass, contract.Id, asset.Id, price);
     }
 
@@ -233,12 +234,12 @@ public sealed class MarketSimulator(
         var affected = await db.Assets
             .Where(a => a.AssetClass == assetClass && a.Status != AssetStatus.Sold)
             .ExecuteUpdateAsync(s => s
-                .SetProperty(a => a.MarketValue, a => Math.Round(a.MarketValue * factor, 2))
-                .SetProperty(a => a.ForcedSaleValue, a => Math.Round(a.ForcedSaleValue * factor, 2))
+                .SetProperty(a => a.MarketValue, a => Math.Min(a.OriginalCost, Math.Round(a.MarketValue * factor, 2)))
+                .SetProperty(a => a.ForcedSaleValue, a => Math.Min(a.OriginalCost, Math.Round(a.ForcedSaleValue * factor, 2)))
                 .SetProperty(a => a.LastValuedAt, now), ct);
 
         return new PortfolioEvent(now, PortfolioEventType.MarketShock,
-            $"Market index for {assetClass} moved {Pct(change)}: {affected:N0} assets revalued",
+            $"Market index for {assetClass} moved {Pct(change)}: {affected.ToString("N0", Culture)} assets revalued",
             assetClass);
     }
 
@@ -275,6 +276,8 @@ public sealed class MarketSimulator(
         return mean + stdDev * Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2);
     }
 
-    private static string Eur(decimal amount) => $"€{amount:N0}";
-    private static string Pct(double change) => $"{(change >= 0 ? "+" : "")}{change:P1}";
+    // Event messages use a fixed culture so they read the same regardless of server locale.
+    private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("en-IE");
+    private static string Eur(decimal amount) => "€" + amount.ToString("N0", Culture);
+    private static string Pct(double change) => (change >= 0 ? "+" : "") + change.ToString("P1", Culture);
 }

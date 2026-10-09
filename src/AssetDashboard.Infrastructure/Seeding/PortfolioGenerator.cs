@@ -249,7 +249,7 @@ public sealed class PortfolioGenerator(int seed = 42)
     {
         var age = YearsBetween(new DateOnly(asset.YearOfManufacture, 7, 1), on);
         var market = fixedValue ?? ValuationModel.MarketValue(asset.OriginalCost, asset.AssetClass, age, asset.Condition,
-            MarketIndex(asset.AssetClass, on.Year) * Math.Clamp(Normal(1, 0.03), 0.9, 1.1));
+            MarketIndex(asset.AssetClass, on.Year) * Math.Clamp(Normal(1, 0.02), 0.95, 1.05));
         var valuation = new AssetValuation
         {
             ValuedAt = Utc(on),
@@ -268,7 +268,7 @@ public sealed class PortfolioGenerator(int seed = 42)
     {
         if (_marketIndex.TryGetValue((assetClass, year), out var idx)) return idx;
         var previous = year > 2010 ? MarketIndex(assetClass, year - 1) : 1.0;
-        idx = Math.Clamp(previous * Normal(1.0, 0.04), 0.8, 1.25);
+        idx = Math.Clamp(previous * Normal(1.0, 0.03), 0.85, 1.15);
         return _marketIndex[(assetClass, year)] = idx;
     }
 

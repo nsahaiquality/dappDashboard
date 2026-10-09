@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { ChartConfiguration } from 'chart.js';
 import { DashboardHubService } from '../core/dashboard-hub.service';
-import { formatEur, formatEurFull, formatInt, formatPct, humanize } from '../core/format';
+import { formatEur, formatEurFull, formatEurKpi, formatInt, formatPct, humanize } from '../core/format';
 import { PortfolioSnapshot } from '../core/models';
 import { ChartComponent, baseOptions, chartTheme } from '../shared/chart';
 import { EventFeed } from './event-feed';
@@ -18,6 +18,7 @@ export class Dashboard {
   protected readonly s = this.hub.snapshot;
   protected readonly eur = formatEur;
   protected readonly eurFull = formatEurFull;
+  protected readonly kpi = formatEurKpi;
   protected readonly pct = formatPct;
   protected readonly int = formatInt;
 

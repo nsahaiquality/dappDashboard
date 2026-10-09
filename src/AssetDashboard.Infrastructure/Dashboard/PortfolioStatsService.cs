@@ -20,7 +20,7 @@ public sealed class PortfolioStatsService(AssetDbContext db)
                 Exposure = g.Sum(c => c.OutstandingPrincipal),
                 AtRisk = g.Where(c => c.DaysPastDue >= 30).Sum(c => c.OutstandingPrincipal),
             })
-            .FirstOrDefaultAsync(ct);
+            .SingleOrDefaultAsync(ct);
 
         var shortfall = await openContracts
             .Select(c => c.OutstandingPrincipal - c.Assets.Where(a => a.Status != AssetStatus.Sold).Sum(a => a.ForcedSaleValue))
@@ -62,15 +62,17 @@ public sealed class PortfolioStatsService(AssetDbContext db)
 
         var topVendors = await openContracts
             .GroupBy(c => new { c.VendorId, c.Vendor.Name })
-            .Select(g => new VendorStat(g.Key.VendorId, g.Key.Name, g.Count(), g.Sum(c => c.OutstandingPrincipal)))
+            .Select(g => new { g.Key.VendorId, g.Key.Name, Count = g.Count(), Exposure = g.Sum(c => c.OutstandingPrincipal) })
             .OrderByDescending(v => v.Exposure)
             .Take(10)
+            .Select(v => new VendorStat(v.VendorId, v.Name, v.Count, v.Exposure))
             .ToListAsync(ct);
 
         var byCountry = await activeAssets
             .GroupBy(a => a.Country)
-            .Select(g => new CountryStat(g.Key, g.Count(), g.Sum(a => a.MarketValue)))
-            .OrderByDescending(c => c.MarketValue)
+            .Select(g => new { Country = g.Key, Count = g.Count(), Market = g.Sum(a => a.MarketValue) })
+            .OrderByDescending(c => c.Market)
+            .Select(c => new CountryStat(c.Country, c.Count, c.Market))
             .ToListAsync(ct);
 
         var marketValue = assetsByClass.Sum(a => a.Market);
@@ -110,7 +112,7 @@ public sealed class PortfolioStatsService(AssetDbContext db)
                 Proceeds = g.Sum(c => c.SalePrice ?? 0),
                 Costs = g.Sum(c => c.RecoveryCosts),
             })
-            .FirstOrDefaultAsync(ct);
+            .SingleOrDefaultAsync(ct);
 
         var averageDaysToSell = await cases
             .Where(c => c.Status == RemarketingStatus.Sold && c.SoldOn != null)

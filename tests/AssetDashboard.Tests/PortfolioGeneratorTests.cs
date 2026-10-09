@@ -80,6 +80,7 @@ public class PortfolioGeneratorTests
             var latest = a.Valuations.MaxBy(v => v.ValuedAt)!;
             Assert.Equal(latest.MarketValue, a.MarketValue);
             Assert.True(a.ForcedSaleValue <= a.MarketValue);
+            Assert.True(a.MarketValue <= a.OriginalCost);
         });
     }
 }

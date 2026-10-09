@@ -42,7 +42,7 @@ docker-compose.yml                PostgreSQL (+ optional pgAdmin)
 |---|---|---|
 | .NET SDK | 10.x | https://dotnet.microsoft.com/download |
 | Node.js | 22+ | `brew install node` |
-| Docker runtime | any | [Docker Desktop](https://www.docker.com/products/docker-desktop/), [OrbStack](https://orbstack.dev) or `brew install colima docker docker-compose && colima start` |
+| Docker runtime | any (Docker Desktop puts its CLI in `~/.docker/bin`; open a new terminal if `docker` isn't found) | [Docker Desktop](https://www.docker.com/products/docker-desktop/), [OrbStack](https://orbstack.dev) or `brew install colima docker docker-compose && colima start` |
 
 ## Running locally
 

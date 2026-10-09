@@ -3,7 +3,7 @@ SCRUM-5,E1,Epic,Development environment & project setup,"Repo, solution structur
 SCRUM-6,T1,Task,Create solution structure (.NET 10: Domain / Infrastructure / Api / Tests),Clean layering; Domain has no dependencies.,E1,asset-dashboard,Done
 SCRUM-7,T2,Task,Scaffold Angular 22 frontend with dev proxy to API,Proxy /api and /hubs (WebSocket) to http://localhost:5080.,E1,asset-dashboard,Done
 SCRUM-8,T3,Task,Docker Compose for PostgreSQL (+ optional pgAdmin),docker compose up -d,E1,asset-dashboard,Done
-SCRUM-9,T4,Task,Install a Docker runtime on macOS (Docker Desktop / OrbStack / Colima),Needed to run Postgres locally.,E1,asset-dashboard,To Do
+SCRUM-9,T4,Task,Install a Docker runtime on macOS (Docker Desktop / OrbStack / Colima),Needed to run Postgres locally.,E1,asset-dashboard,Done
 SCRUM-10,T5,Task,Set up Windows 11 ARM VM (VMware Fusion / Parallels) for client-only tooling,Only if the client requires Windows-only tools; prefer a client-provided Cloud PC/VDI.,E1,asset-dashboard,To Do
 SCRUM-11,T6,Task,"README with disclaimer, run instructions and configuration",,E1,asset-dashboard,Done
 SCRUM-12,E2,Epic,Domain model & synthetic asset database,Realistic vendor-finance data model and deterministic synthetic portfolio while access to the real database is pending.,,asset-dashboard,To Do
@@ -46,3 +46,4 @@ SCRUM-48,T38,Task,"CI pipeline: build, test, lint for backend and frontend","Git
 SCRUM-49,T39,Task,"Containerise API and web (Dockerfiles), compose for full stack",,E6,asset-dashboard,To Do
 SCRUM-50,T40,Task,"Load test: 1M+ assets, snapshot latency and query plans",Add pg_trgm index for search; consider materialised views.,E6,asset-dashboard,To Do
 SCRUM-51,T41,Task,Deployment target decision (Azure App Service / AKS / on-prem IIS),,E6,asset-dashboard,To Do
+SCRUM-52,T42,Task,End-to-end verification against local Postgres and fixes,Run full stack locally; fix issues found.,E3,asset-dashboard,Done

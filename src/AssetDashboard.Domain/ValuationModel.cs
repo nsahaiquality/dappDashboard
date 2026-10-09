@@ -2,7 +2,8 @@ namespace AssetDashboard.Domain;
 
 /// <summary>
 /// Simplified collateral valuation: declining-balance depreciation per asset class,
-/// adjusted for condition and a market index, with a salvage floor.
+/// adjusted for condition and a market index, with a salvage floor. Used equipment is never
+/// valued above its list price when new.
 /// Forced sale value applies a class-specific haircut for quick liquidation.
 /// </summary>
 public static class ValuationModel
@@ -27,7 +28,7 @@ public static class ValuationModel
 
     public static double ConditionFactor(AssetCondition condition) => condition switch
     {
-        AssetCondition.Excellent => 1.08,
+        AssetCondition.Excellent => 1.04,
         AssetCondition.Good => 1.00,
         AssetCondition.Fair => 0.88,
         AssetCondition.Poor => 0.70,
@@ -41,7 +42,8 @@ public static class ValuationModel
         ageYears = Math.Max(0, ageYears);
         var remaining = (1 - p.InitialDrop * Math.Min(ageYears, 1)) * Math.Pow(1 - p.AnnualDepreciation, ageYears);
         remaining = Math.Max(remaining, p.SalvageFloor);
-        return Math.Round(originalCost * (decimal)(remaining * ConditionFactor(condition) * marketIndex), 2);
+        var factor = Math.Min(1.0, remaining * ConditionFactor(condition) * marketIndex);
+        return Math.Round(originalCost * (decimal)factor, 2);
     }
 
     public static decimal ForcedSaleValue(decimal marketValue, AssetClass assetClass) =>
