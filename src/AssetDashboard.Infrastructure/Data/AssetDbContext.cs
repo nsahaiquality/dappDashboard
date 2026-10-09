@@ -12,6 +12,7 @@ public class AssetDbContext(DbContextOptions<AssetDbContext> options) : DbContex
     public DbSet<AssetValuation> AssetValuations => Set<AssetValuation>();
     public DbSet<RemarketingCase> RemarketingCases => Set<RemarketingCase>();
     public DbSet<PortfolioHistoryPoint> PortfolioHistory => Set<PortfolioHistoryPoint>();
+    public DbSet<RefinancingRequest> RefinancingRequests => Set<RefinancingRequest>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -44,6 +45,7 @@ public class AssetDbContext(DbContextOptions<AssetDbContext> options) : DbContex
             e.HasIndex(x => x.Status);
             e.HasIndex(x => x.AssetClass);
             e.HasIndex(x => x.DaysPastDue);
+            e.HasIndex(x => x.MaturityDate);
             e.HasOne(x => x.Vendor).WithMany(x => x.Contracts).HasForeignKey(x => x.VendorId);
             e.HasOne(x => x.Customer).WithMany(x => x.Contracts).HasForeignKey(x => x.CustomerId);
         });
@@ -72,6 +74,18 @@ public class AssetDbContext(DbContextOptions<AssetDbContext> options) : DbContex
             e.HasIndex(x => x.AssetId).IsUnique();
             e.HasIndex(x => x.Status);
             e.HasOne(x => x.Asset).WithOne(x => x.RemarketingCase).HasForeignKey<RemarketingCase>(x => x.AssetId);
+        });
+
+        b.Entity<RefinancingRequest>(e =>
+        {
+            e.Property(x => x.CurrentRate).HasPrecision(6, 3);
+            e.Property(x => x.ProposedRate).HasPrecision(6, 3);
+            e.Property(x => x.LtvAtRequest).HasPrecision(9, 4);
+            e.Property(x => x.ForcedSaleCoverAtRequest).HasPrecision(9, 4);
+            e.Property(x => x.DecisionNote).HasMaxLength(300);
+            e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.RequestedAt);
+            e.HasOne(x => x.Contract).WithMany(x => x.RefinancingRequests).HasForeignKey(x => x.ContractId);
         });
 
         b.Entity<PortfolioHistoryPoint>(e =>

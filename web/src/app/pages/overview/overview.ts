@@ -20,6 +20,9 @@ const EVENT_CATEGORY: Record<PortfolioEventType, Exclude<EventCategory, 'all'>> 
   Repossession: 'remarketing',
   Listed: 'remarketing',
   Sold: 'remarketing',
+  RefinancingRequested: 'credit',
+  RefinancingApproved: 'credit',
+  RefinancingDeclined: 'credit',
 };
 
 /** Status styling: colour always paired with a text label. */
@@ -32,7 +35,13 @@ const EVENT_STYLE: Record<PortfolioEventType, { label: string; tone: string }> =
   Repossession: { label: 'Repossession', tone: 'serious' },
   Listed: { label: 'Listed', tone: 'neutral' },
   Sold: { label: 'Sold', tone: 'good' },
+  RefinancingRequested: { label: 'Refi request', tone: 'neutral' },
+  RefinancingApproved: { label: 'Refi approved', tone: 'good' },
+  RefinancingDeclined: { label: 'Refi declined', tone: 'warning' },
 };
+
+/** Event types added on the server later still render, with a neutral label. */
+const styleFor = (type: PortfolioEventType) => EVENT_STYLE[type] ?? { label: type, tone: 'neutral' };
 
 /** Why a class tends to be underwater; shown on the refinancing watchlist. */
 const UNDERWATER_REASON: Partial<Record<AssetClass, string>> = {
@@ -164,7 +173,7 @@ export class Overview {
       .events()
       .filter((e) => (cat === 'all' || EVENT_CATEGORY[e.type] === cat) && (!cls || !e.assetClass || e.assetClass === cls))
       .slice(0, 14)
-      .map((e) => ({ ...e, style: EVENT_STYLE[e.type], amountText: eventAmount(e) }));
+      .map((e) => ({ ...e, style: styleFor(e.type), amountText: eventAmount(e) }));
   });
 
   protected exportCsv() {

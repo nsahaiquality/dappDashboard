@@ -4,6 +4,7 @@ using AssetDashboard.Api.RealTime;
 using AssetDashboard.Infrastructure.Dashboard;
 using AssetDashboard.Infrastructure.Data;
 using AssetDashboard.Infrastructure.History;
+using AssetDashboard.Infrastructure.Refinancing;
 using AssetDashboard.Infrastructure.Seeding;
 using AssetDashboard.Infrastructure.Simulation;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,7 @@ builder.Services.AddScoped<PortfolioSeeder>();
 builder.Services.AddScoped<PortfolioStatsService>();
 builder.Services.Configure<HistoryOptions>(builder.Configuration.GetSection("History"));
 builder.Services.AddScoped<PortfolioHistoryService>();
+builder.Services.AddScoped<RefinancingService>();
 
 // Real-time pipeline: simulator → event sink → SignalR clients, plus throttled snapshot pushes.
 builder.Services.AddSingleton<SnapshotBroadcaster>();

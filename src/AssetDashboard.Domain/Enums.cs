@@ -83,3 +83,24 @@ public enum RemarketingStatus
     Listed,
     Sold,
 }
+
+public enum RefinancingReason
+{
+    /// <summary>Customer struggles with the current installment and asks for lower payments.</summary>
+    CashFlowStress,
+    /// <summary>Customer wants additional funds against the same collateral.</summary>
+    Expansion,
+    /// <summary>End-of-term balloon / residual value that the customer wants to refinance.</summary>
+    BalloonPayment,
+    /// <summary>Customer asks for a lower rate after an improved credit profile.</summary>
+    RateReduction,
+}
+
+public enum RefinancingStatus
+{
+    Submitted,
+    UnderReview,
+    Approved,
+    Declined,
+    Withdrawn,
+}

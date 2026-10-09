@@ -116,7 +116,10 @@ export type PortfolioEventType =
   | 'Repossession'
   | 'Listed'
   | 'Sold'
-  | 'MarketShock';
+  | 'MarketShock'
+  | 'RefinancingRequested'
+  | 'RefinancingApproved'
+  | 'RefinancingDeclined';
 
 export interface PortfolioEvent {
   at: string;

@@ -42,6 +42,8 @@ public class Contract
 
     public DateOnly StartDate { get; set; }
     public int TermMonths { get; set; }
+    /// <summary>Date of the last installment (start + term); the balloon / residual falls due then.</summary>
+    public DateOnly MaturityDate { get; set; }
 
     public decimal FinancedAmount { get; set; }
     /// <summary>Annual nominal interest rate in percent, e.g. 5.25.</summary>
@@ -57,6 +59,7 @@ public class Contract
     public DateTime UpdatedAt { get; set; }
 
     public List<Asset> Assets { get; set; } = [];
+    public List<RefinancingRequest> RefinancingRequests { get; set; } = [];
 }
 
 /// <summary>A physical piece of equipment serving as collateral.</summary>
@@ -148,4 +151,30 @@ public class PortfolioHistoryPoint
 
     /// <summary>True for generated history, false for figures captured from the live portfolio.</summary>
     public bool IsBackfilled { get; set; }
+}
+
+/// <summary>A customer's request to change the terms of a contract, and the credit decision on it.</summary>
+public class RefinancingRequest
+{
+    public long Id { get; set; }
+    public long ContractId { get; set; }
+    public Contract Contract { get; set; } = null!;
+
+    public DateTime RequestedAt { get; set; }
+    public RefinancingReason Reason { get; set; }
+    /// <summary>New financed amount the customer asks for.</summary>
+    public decimal RequestedAmount { get; set; }
+    public int RequestedTermMonths { get; set; }
+    public decimal CurrentRate { get; set; }
+    public decimal? ProposedRate { get; set; }
+
+    // Risk picture when the request came in.
+    public decimal LtvAtRequest { get; set; }
+    public decimal ForcedSaleCoverAtRequest { get; set; }
+    public int RiskGradeAtRequest { get; set; }
+    public decimal ExpectedLossAtRequest { get; set; }
+
+    public RefinancingStatus Status { get; set; }
+    public DateTime? DecidedAt { get; set; }
+    public string? DecisionNote { get; set; }
 }

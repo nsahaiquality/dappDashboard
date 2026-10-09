@@ -19,6 +19,8 @@ public enum SimulationStep
     ListForSale,
     Sell,
     MarketShock,
+    RequestRefinancing,
+    DecideRefinancing,
 }
 
 public sealed class SimulatorOptions
@@ -76,8 +78,10 @@ public sealed class MarketSimulator(
         < 0.65 => SimulationStep.ReceivePayment,
         < 0.82 => SimulationStep.MissPayment,
         < 0.90 => SimulationStep.Repossess,
-        < 0.95 => SimulationStep.ListForSale,
-        < 0.99 => SimulationStep.Sell,
+        < 0.93 => SimulationStep.ListForSale,
+        < 0.96 => SimulationStep.Sell,
+        < 0.975 => SimulationStep.RequestRefinancing,
+        < 0.99 => SimulationStep.DecideRefinancing,
         _ => SimulationStep.MarketShock,
     }, ct);
 
@@ -91,6 +95,8 @@ public sealed class MarketSimulator(
         SimulationStep.ListForSale => ListForSaleAsync(db, ct),
         SimulationStep.Sell => SellAsync(db, ct),
         SimulationStep.MarketShock => MarketShockAsync(db, ct),
+        SimulationStep.RequestRefinancing => RequestRefinancingAsync(db, ct),
+        SimulationStep.DecideRefinancing => DecideRefinancingAsync(db, ct),
         _ => throw new ArgumentOutOfRangeException(nameof(step)),
     };
 
@@ -223,6 +229,8 @@ public sealed class MarketSimulator(
         @case.SoldOn = DateOnly.FromDateTime(DateTime.UtcNow);
         @case.SalePrice = price;
         asset.Status = AssetStatus.Sold;
+        asset.MarketValue = asset.ForcedSaleValue = price;
+        asset.LastValuedAt = DateTime.UtcNow;
         db.AssetValuations.Add(new AssetValuation
         {
             AssetId = asset.Id, ValuedAt = DateTime.UtcNow, MarketValue = price, ForcedSaleValue = price,
@@ -267,6 +275,94 @@ public sealed class MarketSimulator(
             assetClass);
     }
 
+    private async Task<PortfolioEvent?> RequestRefinancingAsync(AssetDbContext db, CancellationToken ct)
+    {
+        var contract = await RandomAsync(db.Contracts.Include(c => c.Assets).Include(c => c.Customer)
+            .Where(c => (c.Status == ContractStatus.Active || c.Status == ContractStatus.Delinquent)
+                        && !c.RefinancingRequests.Any(r => r.Status == RefinancingStatus.Submitted || r.Status == RefinancingStatus.UnderReview)),
+            c => c.Id, ct);
+        if (contract is null) return null;
+
+        var now = DateTime.UtcNow;
+        var monthsLeft = Math.Max(1, (contract.MaturityDate.DayNumber - DateOnly.FromDateTime(now).DayNumber) / 30);
+        var reason = contract.DaysPastDue > 0 ? RefinancingReason.CashFlowStress
+            : contract.ResidualValue > 0 && monthsLeft <= 9 ? RefinancingReason.BalloonPayment
+            : contract.Customer.RiskGrade <= 4 && _rng.NextDouble() < 0.4 ? RefinancingReason.RateReduction
+            : RefinancingReason.Expansion;
+        var (amount, term) = reason switch
+        {
+            RefinancingReason.CashFlowStress => (contract.OutstandingPrincipal, monthsLeft + _rng.Next(12, 25)),
+            RefinancingReason.Expansion => (Math.Round(contract.OutstandingPrincipal * (decimal)(1.1 + _rng.NextDouble() * 0.2), 2), _rng.Next(36, 61)),
+            RefinancingReason.BalloonPayment => (contract.ResidualValue, _rng.Next(12, 37)),
+            _ => (contract.OutstandingPrincipal, monthsLeft),
+        };
+        var assets = contract.Assets.Where(a => a.Status != AssetStatus.Sold).ToList();
+        var market = assets.Sum(a => a.MarketValue);
+        var forced = assets.Sum(a => a.ForcedSaleValue);
+        var request = new RefinancingRequest
+        {
+            ContractId = contract.Id,
+            RequestedAt = now,
+            Reason = reason,
+            RequestedAmount = amount,
+            RequestedTermMonths = term,
+            CurrentRate = contract.InterestRate,
+            LtvAtRequest = market == 0 ? 9.99m : Math.Min(9.99m, Math.Round(amount / market, 4)),
+            ForcedSaleCoverAtRequest = amount == 0 ? 0 : Math.Min(9.99m, Math.Round(forced / amount, 4)),
+            RiskGradeAtRequest = contract.Customer.RiskGrade,
+            ExpectedLossAtRequest = CreditRisk.ExpectedLoss(amount, forced, contract.Customer.RiskGrade, contract.DaysPastDue),
+            Status = RefinancingStatus.Submitted,
+        };
+        db.RefinancingRequests.Add(request);
+        await db.SaveChangesAsync(ct);
+
+        return new PortfolioEvent(now, PortfolioEventType.RefinancingRequested,
+            $"{contract.ContractNumber} requests refinancing ({Humanize(reason)}) of {Eur(amount)} over {term} months, LTV {request.LtvAtRequest.ToString("P0", Culture)}",
+            contract.AssetClass, contract.Id, Amount: amount);
+    }
+
+    /// <summary>Decides the oldest open request with the credit policy; an approval re-prices the contract.</summary>
+    private async Task<PortfolioEvent?> DecideRefinancingAsync(AssetDbContext db, CancellationToken ct)
+    {
+        var request = await db.RefinancingRequests.Include(r => r.Contract)
+            .Where(r => r.Status == RefinancingStatus.Submitted || r.Status == RefinancingStatus.UnderReview)
+            .OrderBy(r => r.RequestedAt)
+            .FirstOrDefaultAsync(ct);
+        if (request is null) return null;
+
+        var now = DateTime.UtcNow;
+        var contract = request.Contract;
+        var decision = RefinancingPolicy.Decide(request.Reason, request.LtvAtRequest, request.RiskGradeAtRequest, contract.DaysPastDue, request.CurrentRate);
+        request.Status = decision.Status;
+        request.ProposedRate = decision.ProposedRate;
+        request.DecisionNote = decision.Note;
+        request.DecidedAt = now;
+
+        if (decision.Status == RefinancingStatus.Approved)
+        {
+            // New terms from today: requested amount over the requested term at the proposed rate.
+            var today = DateOnly.FromDateTime(now);
+            contract.OutstandingPrincipal = request.RequestedAmount;
+            contract.InterestRate = decision.ProposedRate!.Value;
+            contract.MonthlyInstallment = Amortization.Installment(request.RequestedAmount, contract.InterestRate, request.RequestedTermMonths);
+            contract.ResidualValue = 0;
+            contract.MaturityDate = today.AddMonths(request.RequestedTermMonths);
+            contract.TermMonths = (contract.MaturityDate.Year - contract.StartDate.Year) * 12 + contract.MaturityDate.Month - contract.StartDate.Month;
+            if (request.Reason == RefinancingReason.CashFlowStress)
+            {
+                contract.Status = ContractStatus.Restructured;
+                contract.DaysPastDue = 0;
+            }
+            contract.UpdatedAt = now;
+        }
+        await db.SaveChangesAsync(ct);
+
+        var approved = decision.Status == RefinancingStatus.Approved;
+        return new PortfolioEvent(now, approved ? PortfolioEventType.RefinancingApproved : PortfolioEventType.RefinancingDeclined,
+            $"{contract.ContractNumber} refinancing {(approved ? "approved at " + decision.ProposedRate!.Value.ToString("0.00", Culture) + "%" : "declined")}: {decision.Note}",
+            contract.AssetClass, contract.Id, Amount: request.RequestedAmount);
+    }
+
     // ---- helpers ---------------------------------------------------------
 
     /// <summary>
@@ -302,6 +398,9 @@ public sealed class MarketSimulator(
 
     // Event messages use a fixed culture so they read the same regardless of server locale.
     private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("en-IE");
+    private static string Humanize(Enum value) =>
+        System.Text.RegularExpressions.Regex.Replace(value.ToString(), "(?<=[a-z])([A-Z])", " $1").ToLowerInvariant();
+
     private static string Eur(decimal amount) => "€" + amount.ToString("N0", Culture);
     private static string Pct(double change) => (change >= 0 ? "+" : "") + change.ToString("P1", Culture);
 }

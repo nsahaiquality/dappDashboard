@@ -128,6 +128,7 @@ public sealed class PortfolioGenerator(int seed = 42)
             Currency = "EUR",
             StartDate = start,
             TermMonths = term,
+            MaturityDate = start.AddMonths(term),
             FinancedAmount = financed,
             InterestRate = rate,
             MonthlyInstallment = installment,
@@ -147,6 +148,8 @@ public sealed class PortfolioGenerator(int seed = 42)
 
         if (status == ContractStatus.Defaulted && dpd > 150)
             Recover(contract, info, start, monthsPaid, purchasePrice / purchaseTotal, asOf);
+        else if (status == ContractStatus.Restructured || _rng.NextDouble() < 0.04)
+            AddRefinancingRequest(contract, customer, monthsElapsed, asOf);
 
         return contract;
     }
@@ -225,13 +228,9 @@ public sealed class PortfolioGenerator(int seed = 42)
                 @case.SoldOn = Min(@case.ListedOn!.Value.AddDays(_rng.Next(7, 60)), asOf);
                 @case.SalePrice = Math.Round(fsv * (decimal)Math.Clamp(Normal(1.0, 0.12), 0.5, 1.4), 2);
                 asset.Status = AssetStatus.Sold;
-                asset.Valuations.Add(new AssetValuation
-                {
-                    ValuedAt = Utc(@case.SoldOn.Value),
-                    MarketValue = @case.SalePrice.Value,
-                    ForcedSaleValue = @case.SalePrice.Value,
-                    Method = ValuationMethod.AuctionComparable,
-                });
+                AddValuation(asset, @case.SoldOn.Value, @case.SalePrice.Value, ValuationMethod.AuctionComparable);
+                // The realised price is the asset's final value, whatever the class haircut would say.
+                asset.ForcedSaleValue = asset.Valuations[^1].ForcedSaleValue = @case.SalePrice.Value;
             }
 
             asset.RemarketingCase = @case;
@@ -243,6 +242,71 @@ public sealed class PortfolioGenerator(int seed = 42)
             contract.Status = ContractStatus.Closed;
             contract.OutstandingPrincipal = 0;
         }
+    }
+
+    /// <summary>A refinancing request in the last year, decided by the credit policy unless still open.</summary>
+    private void AddRefinancingRequest(Contract contract, Customer customer, int monthsElapsed, DateOnly asOf)
+    {
+        if (contract.Status is ContractStatus.Closed or ContractStatus.Defaulted || monthsElapsed < 3) return;
+
+        var monthsLeft = contract.TermMonths - monthsElapsed;
+        var reason = contract.Status == ContractStatus.Restructured || contract.DaysPastDue > 0 ? RefinancingReason.CashFlowStress
+            : contract.ResidualValue > 0 && monthsLeft <= 9 ? RefinancingReason.BalloonPayment
+            : customer.RiskGrade <= 4 && _rng.NextDouble() < 0.4 ? RefinancingReason.RateReduction
+            : RefinancingReason.Expansion;
+        var (amount, term) = reason switch
+        {
+            RefinancingReason.CashFlowStress => (contract.OutstandingPrincipal, monthsLeft + _rng.Next(12, 25)),
+            RefinancingReason.Expansion => (Math.Round(contract.OutstandingPrincipal * (decimal)Uniform(1.10, 1.30), 2), _rng.Next(36, 61)),
+            RefinancingReason.BalloonPayment => (contract.ResidualValue, _rng.Next(12, 37)),
+            _ => (contract.OutstandingPrincipal, Math.Max(6, monthsLeft)),
+        };
+
+        var market = contract.Assets.Sum(a => a.MarketValue);
+        var forced = contract.Assets.Sum(a => a.ForcedSaleValue);
+        var ltv = market == 0 ? 9.99m : Math.Round(amount / market, 4);
+        var requestedOn = asOf.AddDays(-_rng.Next(0, Math.Min(365, monthsElapsed * 30)));
+        var request = new RefinancingRequest
+        {
+            RequestedAt = Utc(requestedOn).AddHours(_rng.Next(8, 18)),
+            Reason = reason,
+            RequestedAmount = amount,
+            RequestedTermMonths = term,
+            CurrentRate = contract.InterestRate,
+            LtvAtRequest = Math.Min(ltv, 9.99m),
+            ForcedSaleCoverAtRequest = amount == 0 ? 0 : Math.Min(9.99m, Math.Round(forced / amount, 4)),
+            RiskGradeAtRequest = customer.RiskGrade,
+            ExpectedLossAtRequest = CreditRisk.ExpectedLoss(amount, forced, customer.RiskGrade, contract.DaysPastDue),
+            Status = RefinancingStatus.Submitted,
+        };
+
+        var age = asOf.DayNumber - requestedOn.DayNumber;
+        if (contract.Status == ContractStatus.Restructured)
+        {
+            Decide(request, RefinancingStatus.Approved, contract.InterestRate, "Approved as restructuring: longer term, lower installment.", 7);
+        }
+        else if (age < 10)
+        {
+            request.Status = _rng.NextDouble() < 0.5 ? RefinancingStatus.Submitted : RefinancingStatus.UnderReview;
+        }
+        else if (_rng.NextDouble() < 0.06)
+        {
+            Decide(request, RefinancingStatus.Withdrawn, null, "Withdrawn by customer.", _rng.Next(3, Math.Min(20, age)));
+        }
+        else
+        {
+            var d = RefinancingPolicy.Decide(reason, request.LtvAtRequest, customer.RiskGrade, contract.DaysPastDue, contract.InterestRate);
+            Decide(request, d.Status, d.ProposedRate, d.Note, _rng.Next(2, Math.Min(15, age)));
+        }
+        contract.RefinancingRequests.Add(request);
+    }
+
+    private static void Decide(RefinancingRequest request, RefinancingStatus status, decimal? rate, string note, int daysLater)
+    {
+        request.Status = status;
+        request.ProposedRate = rate;
+        request.DecisionNote = note;
+        request.DecidedAt = request.RequestedAt.AddDays(daysLater);
     }
 
     private void AddValuation(Asset asset, DateOnly on, decimal? fixedValue = null, ValuationMethod method = ValuationMethod.IndexBased)

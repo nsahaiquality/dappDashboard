@@ -53,6 +53,9 @@ public enum PortfolioEventType
     Listed,
     Sold,
     MarketShock,
+    RefinancingRequested,
+    RefinancingApproved,
+    RefinancingDeclined,
 }
 
 /// <summary>A single change in the portfolio, streamed to the live event feed.</summary>

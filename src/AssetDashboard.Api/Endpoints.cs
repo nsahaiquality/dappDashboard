@@ -4,6 +4,7 @@ using AssetDashboard.Api.RealTime;
 using AssetDashboard.Domain;
 using AssetDashboard.Infrastructure.Dashboard;
 using AssetDashboard.Infrastructure.History;
+using AssetDashboard.Infrastructure.Refinancing;
 using AssetDashboard.Infrastructure.Simulation;
 
 namespace AssetDashboard.Api;
@@ -24,6 +25,16 @@ public static class Endpoints
 
         api.MapGet("/history", (PortfolioHistoryService history, AssetClass? assetClass, int days = 365, CancellationToken ct = default) =>
             history.GetAsync(days, assetClass, ct));
+
+        var refinancing = api.MapGroup("/refinancing");
+        refinancing.MapGet("/summary", ([AsParameters] FilterQuery q, RefinancingService svc, CancellationToken ct) =>
+            svc.GetSummaryAsync(q.ToFilter(), ct));
+        refinancing.MapGet("/requests", ([AsParameters] FilterQuery q, RefinancingService svc, RefinancingStatus? status,
+                int page = 1, int pageSize = 25, CancellationToken ct = default) =>
+            svc.GetRequestsAsync(q.ToFilter(), status, page, pageSize, ct));
+        refinancing.MapGet("/candidates", ([AsParameters] FilterQuery q, RefinancingService svc,
+                int page = 1, int pageSize = 25, CancellationToken ct = default) =>
+            svc.GetCandidatesAsync(q.ToFilter(), page, pageSize, ct));
 
         api.MapGet("/reference", (PortfolioStatsService stats, CancellationToken ct) => stats.GetReferenceDataAsync(ct));
 
