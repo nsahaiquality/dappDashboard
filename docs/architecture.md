@@ -90,6 +90,31 @@ the local Postgres database. Options for the real integration, roughly in order 
 In every case, the integration only needs to (a) keep the read model in Postgres up to date and
 (b) call `IPortfolioEventSink.PublishAsync`.
 
+## Backend services per view
+
+Each planned page has a read service in `AssetDashboard.Infrastructure` and its endpoints under
+`/api`. Every service takes the same `PortfolioFilter`, so filters behave the same everywhere.
+
+| Service | Feeds | Endpoints |
+|---|---|---|
+| `PortfolioStatsService` | Overview, asset explorer | `/dashboard/snapshot`, `/assets`, `/assets/{id}`, `/assets/export` |
+| `PortfolioHistoryService` + `HistoryRecorder` | Trend charts | `/history` |
+| `RefinancingService` | Refinancing | `/refinancing/summary`, `/requests`, `/candidates` |
+| `RemarketingService` | Remarketing | `/remarketing/summary`, `/cases`, `/auctions` |
+| `VendorService` | Vendors | `/vendors`, `/vendors/{id}` |
+| `SourceService` + `SourceFeedSimulator` | Sources | `/sources`, `/sources/{id}/runs` |
+
+The services contain no business rules. These sit in the domain project and are unit-tested
+there:
+- **`CreditRisk`:** probability of default, loss given default, expected loss.
+- **`RefinancingPolicy`:** the credit decision on refinancing requests.
+- **`RemarketingRules`:** storage rates, selling fees, hammer price.
+- **`ValuationModel` and `Amortization`:** asset values and loan repayment schedules.
+
+**Testing:** `tests/AssetDashboard.IntegrationTests` starts the real API against a throwaway
+PostgreSQL container (Testcontainers). It calls every endpoint and every simulator step, so EF
+Core query-translation errors fail the build rather than the dashboard.
+
 ## Large datasets
 
 - Aggregation runs in Postgres (`GROUP BY` with indexes on `Status`, `AssetClass` and
@@ -99,8 +124,8 @@ In every case, the integration only needs to (a) keep the read model in Postgres
 - Next steps if the snapshot gets slow: incremental counters updated per event, materialised
   views refreshed on a schedule, or a separate reporting store (read replica or columnar
   storage).
-- Seeding uses batched inserts (2,000 contracts per `SaveChanges`). For more than 1M rows, switch
-  to `COPY` (Npgsql binary import).
+- Seeding streams contracts in chunks and writes them with binary `COPY` (see
+  `docs/domain-model.md`, "Seeding at scale").
 
 ## Technology choices
 

@@ -72,6 +72,16 @@ Useful endpoints:
 | `GET /api/assets?<filter>&status=&search=&sort=MarketValue\|Ltv\|DaysPastDue&page=&pageSize=` | Paged asset list |
 | `GET /api/assets/export?<same query>` | CSV export (up to 100k rows) |
 | `GET /api/assets/{id}` | Asset detail with valuation and exposure history |
+| `GET /api/history?days=&assetClass=` | Daily portfolio history (24 months backfilled + live) |
+| `GET /api/refinancing/summary?<filter>` | Requests by status, approval rate, expected loss by class, maturity wall |
+| `GET /api/refinancing/requests?<filter>&status=` | Refinancing requests and decisions |
+| `GET /api/refinancing/candidates?<filter>` | Contracts maturing, with balloon due, underwater or in arrears, with PD/LGD/EL |
+| `GET /api/remarketing/summary?<filter>` | Pipeline, stock ageing, recovery by channel/class, costs, upcoming auctions |
+| `GET /api/remarketing/cases?<filter>&status=&channel=` | Recovery cases with cost breakdown |
+| `GET /api/remarketing/auctions?<filter>&status=` | Auctions with lots, hammer total, sell-through |
+| `GET /api/vendors?<filter>&sort=Exposure\|DefaultRate\|Origination\|TargetAttainment` | Vendor performance |
+| `GET /api/vendors/{id}` | Vendor detail: 24-month origination, mixes, delinquency, top customers |
+| `GET /api/sources` / `GET /api/sources/{id}/runs` | Source systems with freshness, and their load runs |
 | `POST /api/simulator/pause` / `resume` | Stop or start the live data simulator |
 | `/hubs/dashboard` | SignalR hub: server sends `Snapshot` and `PortfolioEvent`; client calls `SetFilter(filter)` |
 | `/openapi/v1.json` | OpenAPI document (Development) |
@@ -83,11 +93,14 @@ Useful endpoints:
 |---|---|---|
 | `ConnectionStrings:AssetDb` | local Docker Postgres | Database |
 | `Database:MigrateOnStartup` | `true` | Apply EF migrations on start |
-| `Seed:Contracts` | `20000` | Size of the synthetic portfolio (try 200000 for scale tests) |
+| `Seed:Contracts` | `20000` | Size of the synthetic portfolio; 1,000,000 seeds in a few minutes (binary COPY) |
 | `Seed:RandomSeed` | `42` | Same seed gives the same portfolio |
 | `Simulator:Enabled` / `EventsPerSecond` | `true` / `4` | Live change rate |
+| `History:BackfillDays` / `CaptureIntervalMinutes` | `730` / `5` | Synthetic history length; how often today's row is refreshed |
+| `Sources:Enabled` / `HistoryDays` | `true` / `30` | Simulated source-system loads |
 
-To regenerate the data, drop the database (`docker compose down -v`) and restart the API.
+To regenerate the data, drop the database (`docker compose down -v`) and restart the API. For a one-off large
+portfolio: `Seed__Contracts=1000000 dotnet run --project src/AssetDashboard.Api` on an empty database.
 
 ## Development
 

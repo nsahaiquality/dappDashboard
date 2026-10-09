@@ -27,6 +27,9 @@ erDiagram
     CONTRACT ||--|{ ASSET : finances
     ASSET ||--o{ ASSET_VALUATION : "valued by"
     ASSET ||--o| REMARKETING_CASE : "recovered via"
+    AUCTION ||--o{ REMARKETING_CASE : "sells as lots"
+    CONTRACT ||--o{ REFINANCING_REQUEST : "asks to change"
+    SOURCE_SYSTEM ||--o{ LOAD_RUN : "loads"
 
     VENDOR {
         int Id
@@ -90,7 +93,53 @@ erDiagram
         decimal SalePrice
         decimal RecoveryCosts
     }
+    AUCTION {
+        int Id
+        string Name
+        enum Channel
+        date Date
+        string Location
+        enum Status
+        int LotsPassedIn
+    }
+    REFINANCING_REQUEST {
+        long Id
+        datetime RequestedAt
+        enum Reason
+        decimal RequestedAmount
+        int RequestedTermMonths
+        decimal LtvAtRequest
+        decimal ExpectedLossAtRequest
+        enum Status
+        string DecisionNote
+    }
+    SOURCE_SYSTEM {
+        int Id
+        string Name
+        enum Kind
+        int ExpectedIntervalMinutes
+    }
+    LOAD_RUN {
+        long Id
+        datetime StartedAt
+        datetime FinishedAt
+        enum Status
+        int RowsRead
+        int RowsRejected
+    }
 ```
+
+`PORTFOLIO_HISTORY_POINT` (not drawn) holds one row per day for the total and each asset class:
+exposure, collateral, forced sale value, 30+ and 90+ dpd exposure and net recoveries.
+
+**Fields added for the planned views:**
+
+| Entity | Fields |
+|---|---|
+| Contract | `MaturityDate` (start + term; the balloon falls due then) |
+| Vendor | `ProgramType` (manufacturer, dealer, distributor), `Recourse` (none, partial, full, buy-back), `Rating` A–D, `OnboardedOn`, `AnnualVolumeTarget` |
+| RemarketingCase | `AuctionId`, `Bids`, `TimesPassedIn`, `AskingPrice`, `PriceReductions`, `Yard`, `DailyStorageRate`, cost breakdown (`TransportCost`, `StorageCost`, `RefurbishmentCost`, `SellingFees`; `RecoveryCosts` is their sum) |
+
 
 ### Key terms
 
@@ -103,6 +152,12 @@ erDiagram
 | Forced sale shortfall | Σ max(0, exposure − FSV) per contract: loss if all were liquidated now |
 | DPD | Days past due; buckets: current, 1–29, 30–59, 60–89, 90+ |
 | Recovery rate | (sale proceeds − recovery costs) ÷ exposure at default |
+| PD | One-year probability of default: 0.3% (grade 1) to 20% (grade 10), ×1.5 / ×3 / ×5 for 1–29 / 30–59 / 60–89 dpd, 100% at 90+ |
+| LGD | Share of exposure not covered by the forced sale value net of 6% remarketing costs |
+| Expected loss | PD × LGD × exposure |
+| Maturity wall | Exposure (and balloon amounts) falling due per quarter |
+| Sell-through | Lots sold ÷ lots offered at an auction (sold + passed in) |
+| Freshness | Time since a source's last successful load: Fresh ≤ 1.5×, Late ≤ 3×, Stale beyond its expected interval |
 
 ### State machines
 
@@ -161,6 +216,48 @@ and a per-class market index (random walk), with a salvage floor.
 - About 3.5% defaulted and about 4% delinquent.
 - Recovery rate about 60%.
 
+**Refinancing:**
+- About 4% of open contracts have a request in the last year; every restructured contract has an
+  approved cash-flow-stress request.
+- Reasons follow the contract: arrears lead to cash-flow stress, a residual due within 9 months to a
+  balloon refinancing, a good grade sometimes to a rate reduction, otherwise expansion.
+- Decisions follow `RefinancingPolicy`: decline above 110% requested LTV, at grade 9+, for rate cuts
+  above grade 4, or when already in default. Otherwise approve, with a rate add-on for grade, LTV
+  above 85% and arrears.
+
+**Auctions and costs:**
+- Auctions run on Thursdays per channel (live or online) and country. Past ones are completed;
+  upcoming ones hold the currently listed lots.
+- Hammer price is about 0.75 + 0.03 × bids (capped at 15 bids) times the forced sale value, plus
+  noise. About 15–20% of lots are passed in at least once.
+- Costs: transport is 1–3% of value plus €500–2,500; storage is €8–45 per day by class;
+  refurbishment is 1–5% of value for half of the assets; seller fees are 8% (live auction),
+  5% (online), 2% (private) or 0% (vendor buy-back).
+
+**Vendors:** imaging, IT and clean-tech programmes are mostly manufacturer-led with buy-back;
+machinery is mostly dealer-led with partial or no recourse. Ratings are A 20%, B 45%, C 28%,
+D 7%. Volume targets are 85–135% of last year's actual origination.
+
+**History:** 24 months back from today's real figures. Exposure grows into today at 6–18% a year
+depending on the class; LTV and arrears follow mean-reverting random walks, with arrears peaking
+in winter.
+
+**Source systems** (all fictional):
+
+| Source | Frequency | Failure rate | Warning rate |
+|---|---|---|---|
+| Core leasing system | 15 min | 2% | 4% |
+| Equipment valuation feed | daily | 3% | 8% |
+| Auction results feed | hourly | 4% | 5% |
+| Credit bureau scores | daily | 2% | 3% |
+| General ledger (ERP) | 6-hourly | 2% | 6% |
+
+## Seeding at scale
+
+Seeding streams contracts in chunks of 10,000. It assigns keys on the client and writes every
+table with PostgreSQL binary `COPY` (`BulkCopy`, driven by the EF Core model). Afterwards it resets
+the identity sequences and runs `ANALYZE`. Memory stays flat regardless of portfolio size.
+
 ## Simulator
 
 `MarketSimulator` makes about 4 changes per second:
@@ -171,6 +268,11 @@ and a per-class market index (random walk), with a salvage floor.
 | Payments received | 25% |
 | Missed payments (skewed to weaker customers) | 17% |
 | Repossessions of defaulted contracts | 8% |
-| Listings | 5% |
-| Sales | 4% |
+| Listings | 2% |
+| Private sales / vendor buy-back | 2% |
 | Market shocks (a whole asset class moves 2–6%, applied with one bulk `UPDATE`) | 1% |
+| Refinancing requests / decisions (approval re-prices the contract) | 1.5% / 1.5% |
+| Auctions run (lots sold or passed in) / asking-price cuts | 1% / 1% |
+
+Separately, `SourceFeedSimulator` runs each source's loads on schedule and reports failures and
+recoveries to the live feed, and `HistoryRecorder` refreshes today's history rows every 5 minutes.
