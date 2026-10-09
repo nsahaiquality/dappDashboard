@@ -9,7 +9,8 @@ import { FilterBar } from '../../shared/filter-bar';
 import { Icon } from '../../shared/icon';
 import { PageHeader } from '../../shared/page-header';
 
-type EventCategory = 'all' | 'credit' | 'valuation' | 'remarketing';
+// 'data' (source system loads) only shows under All.
+type EventCategory = 'all' | 'credit' | 'valuation' | 'remarketing' | 'data';
 
 const EVENT_CATEGORY: Record<PortfolioEventType, Exclude<EventCategory, 'all'>> = {
   PaymentReceived: 'credit',
@@ -25,6 +26,8 @@ const EVENT_CATEGORY: Record<PortfolioEventType, Exclude<EventCategory, 'all'>> 
   RefinancingDeclined: 'credit',
   AuctionCompleted: 'remarketing',
   PriceReduced: 'remarketing',
+  DataLoadFailed: 'data',
+  DataLoadRecovered: 'data',
 };
 
 /** Status styling: colour always paired with a text label. */
@@ -42,6 +45,8 @@ const EVENT_STYLE: Record<PortfolioEventType, { label: string; tone: string }> =
   RefinancingDeclined: { label: 'Refi declined', tone: 'warning' },
   AuctionCompleted: { label: 'Auction', tone: 'good' },
   PriceReduced: { label: 'Price cut', tone: 'neutral' },
+  DataLoadFailed: { label: 'Load failed', tone: 'critical' },
+  DataLoadRecovered: { label: 'Load recovered', tone: 'good' },
 };
 
 /** Event types added on the server later still render, with a neutral label. */

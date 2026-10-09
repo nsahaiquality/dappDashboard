@@ -58,6 +58,8 @@ public enum PortfolioEventType
     RefinancingDeclined,
     AuctionCompleted,
     PriceReduced,
+    DataLoadFailed,
+    DataLoadRecovered,
 }
 
 /// <summary>A single change in the portfolio, streamed to the live event feed.</summary>

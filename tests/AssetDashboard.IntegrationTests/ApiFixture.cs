@@ -38,6 +38,8 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("Seed:RandomSeed", "7");
             b.UseSetting("Simulator:Enabled", "false");
             b.UseSetting("History:BackfillDays", "120");
+            b.UseSetting("Sources:HistoryDays", "10");
+            b.UseSetting("Sources:Enabled", "false");
         });
         Client = Factory.CreateClient();
     }

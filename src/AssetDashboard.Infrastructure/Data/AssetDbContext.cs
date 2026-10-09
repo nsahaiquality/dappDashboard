@@ -14,6 +14,8 @@ public class AssetDbContext(DbContextOptions<AssetDbContext> options) : DbContex
     public DbSet<PortfolioHistoryPoint> PortfolioHistory => Set<PortfolioHistoryPoint>();
     public DbSet<RefinancingRequest> RefinancingRequests => Set<RefinancingRequest>();
     public DbSet<Auction> Auctions => Set<Auction>();
+    public DbSet<SourceSystem> SourceSystems => Set<SourceSystem>();
+    public DbSet<LoadRun> LoadRuns => Set<LoadRun>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -78,6 +80,20 @@ public class AssetDbContext(DbContextOptions<AssetDbContext> options) : DbContex
             e.HasOne(x => x.Asset).WithOne(x => x.RemarketingCase).HasForeignKey<RemarketingCase>(x => x.AssetId);
             e.HasOne(x => x.Auction).WithMany(x => x.Lots).HasForeignKey(x => x.AuctionId);
             e.Property(x => x.Yard).HasMaxLength(100);
+        });
+
+        b.Entity<SourceSystem>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(100);
+            e.Property(x => x.Owner).HasMaxLength(100);
+            e.Property(x => x.Description).HasMaxLength(300);
+        });
+
+        b.Entity<LoadRun>(e =>
+        {
+            e.Property(x => x.Message).HasMaxLength(300);
+            e.HasIndex(x => new { x.SourceSystemId, x.StartedAt });
+            e.HasOne(x => x.SourceSystem).WithMany(x => x.Runs).HasForeignKey(x => x.SourceSystemId);
         });
 
         b.Entity<Auction>(e =>

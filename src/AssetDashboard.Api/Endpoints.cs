@@ -6,6 +6,7 @@ using AssetDashboard.Infrastructure.Dashboard;
 using AssetDashboard.Infrastructure.History;
 using AssetDashboard.Infrastructure.Refinancing;
 using AssetDashboard.Infrastructure.Remarketing;
+using AssetDashboard.Infrastructure.Sources;
 using AssetDashboard.Infrastructure.Vendors;
 using AssetDashboard.Infrastructure.Simulation;
 
@@ -53,6 +54,11 @@ public static class Endpoints
             svc.GetVendorsAsync(q.ToFilter(), sort, page, pageSize, ct));
         api.MapGet("/vendors/{id:int}", async (int id, VendorService svc, CancellationToken ct) =>
             await svc.GetVendorAsync(id, ct) is { } vendor ? Results.Ok(vendor) : Results.NotFound());
+
+        api.MapGet("/sources", (SourceService svc, CancellationToken ct) => svc.GetSourcesAsync(ct));
+        api.MapGet("/sources/{id:int}/runs", async (int id, SourceService svc, LoadStatus? status, int page = 1, int pageSize = 50,
+                CancellationToken ct = default) =>
+            await svc.GetRunsAsync(id, status, page, pageSize, ct) is { } runs ? Results.Ok(runs) : Results.NotFound());
 
         api.MapGet("/reference", (PortfolioStatsService stats, CancellationToken ct) => stats.GetReferenceDataAsync(ct));
 

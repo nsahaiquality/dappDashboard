@@ -6,6 +6,7 @@ using AssetDashboard.Infrastructure.Data;
 using AssetDashboard.Infrastructure.History;
 using AssetDashboard.Infrastructure.Refinancing;
 using AssetDashboard.Infrastructure.Remarketing;
+using AssetDashboard.Infrastructure.Sources;
 using AssetDashboard.Infrastructure.Vendors;
 using AssetDashboard.Infrastructure.Seeding;
 using AssetDashboard.Infrastructure.Simulation;
@@ -25,6 +26,9 @@ builder.Services.AddScoped<PortfolioHistoryService>();
 builder.Services.AddScoped<RefinancingService>();
 builder.Services.AddScoped<RemarketingService>();
 builder.Services.AddScoped<VendorService>();
+builder.Services.AddScoped<SourceService>();
+builder.Services.Configure<SourceFeedOptions>(builder.Configuration.GetSection("Sources"));
+builder.Services.AddHostedService<SourceFeedSimulator>();
 
 // Real-time pipeline: simulator → event sink → SignalR clients, plus throttled snapshot pushes.
 builder.Services.AddSingleton<SnapshotBroadcaster>();
@@ -55,6 +59,8 @@ if (app.Configuration.GetValue("Database:MigrateOnStartup", false))
         await scope.ServiceProvider.GetRequiredService<PortfolioSeeder>().SeedAsync(seed);
         var history = app.Configuration.GetSection("History").Get<HistoryOptions>() ?? new HistoryOptions();
         await scope.ServiceProvider.GetRequiredService<PortfolioHistoryService>().EnsureBackfilledAsync(history.BackfillDays, seed.RandomSeed);
+        var sources = app.Configuration.GetSection("Sources").Get<SourceFeedOptions>() ?? new SourceFeedOptions();
+        await SourceFeedSimulator.EnsureSeededAsync(db, sources.HistoryDays, seed.RandomSeed);
     }
 }
 

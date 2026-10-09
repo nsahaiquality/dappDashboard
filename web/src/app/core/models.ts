@@ -121,7 +121,9 @@ export type PortfolioEventType =
   | 'RefinancingApproved'
   | 'RefinancingDeclined'
   | 'AuctionCompleted'
-  | 'PriceReduced';
+  | 'PriceReduced'
+  | 'DataLoadFailed'
+  | 'DataLoadRecovered';
 
 export interface PortfolioEvent {
   at: string;

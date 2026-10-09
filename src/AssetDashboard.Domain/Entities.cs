@@ -222,3 +222,32 @@ public class RefinancingRequest
     public DateTime? DecidedAt { get; set; }
     public string? DecisionNote { get; set; }
 }
+
+/// <summary>An upstream system that feeds the dashboard's read model.</summary>
+public class SourceSystem
+{
+    public int Id { get; set; }
+    public required string Name { get; set; }
+    public SourceKind Kind { get; set; }
+    public required string Owner { get; set; }
+    public required string Description { get; set; }
+    /// <summary>How often a load is expected; freshness is judged against this.</summary>
+    public int ExpectedIntervalMinutes { get; set; }
+
+    public List<LoadRun> Runs { get; set; } = [];
+}
+
+/// <summary>One load (extract and apply) from a source system.</summary>
+public class LoadRun
+{
+    public long Id { get; set; }
+    public int SourceSystemId { get; set; }
+    public SourceSystem SourceSystem { get; set; } = null!;
+
+    public DateTime StartedAt { get; set; }
+    public DateTime FinishedAt { get; set; }
+    public LoadStatus Status { get; set; }
+    public int RowsRead { get; set; }
+    public int RowsRejected { get; set; }
+    public string? Message { get; set; }
+}

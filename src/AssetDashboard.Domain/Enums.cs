@@ -130,3 +130,19 @@ public enum RecourseType
     /// <summary>Vendor buys the repossessed asset back at an agreed price.</summary>
     BuyBack,
 }
+
+public enum SourceKind
+{
+    CoreLeasing,
+    ValuationProvider,
+    AuctionHouse,
+    CreditBureau,
+    Erp,
+}
+
+public enum LoadStatus
+{
+    Succeeded,
+    SucceededWithWarnings,
+    Failed,
+}
