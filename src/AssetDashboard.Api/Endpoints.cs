@@ -5,6 +5,7 @@ using AssetDashboard.Domain;
 using AssetDashboard.Infrastructure.Dashboard;
 using AssetDashboard.Infrastructure.History;
 using AssetDashboard.Infrastructure.Refinancing;
+using AssetDashboard.Infrastructure.Remarketing;
 using AssetDashboard.Infrastructure.Simulation;
 
 namespace AssetDashboard.Api;
@@ -35,6 +36,16 @@ public static class Endpoints
         refinancing.MapGet("/candidates", ([AsParameters] FilterQuery q, RefinancingService svc,
                 int page = 1, int pageSize = 25, CancellationToken ct = default) =>
             svc.GetCandidatesAsync(q.ToFilter(), page, pageSize, ct));
+
+        var remarketing = api.MapGroup("/remarketing");
+        remarketing.MapGet("/summary", ([AsParameters] FilterQuery q, RemarketingService svc, CancellationToken ct) =>
+            svc.GetSummaryAsync(q.ToFilter(), ct));
+        remarketing.MapGet("/cases", ([AsParameters] FilterQuery q, RemarketingService svc, RemarketingStatus? status,
+                RemarketingChannel? channel, int page = 1, int pageSize = 25, CancellationToken ct = default) =>
+            svc.GetCasesAsync(q.ToFilter(), status, channel, page, pageSize, ct));
+        remarketing.MapGet("/auctions", ([AsParameters] FilterQuery q, RemarketingService svc, AuctionStatus? status,
+                int page = 1, int pageSize = 25, CancellationToken ct = default) =>
+            svc.GetAuctionsAsync(q.ToFilter(), status, page, pageSize, ct));
 
         api.MapGet("/reference", (PortfolioStatsService stats, CancellationToken ct) => stats.GetReferenceDataAsync(ct));
 

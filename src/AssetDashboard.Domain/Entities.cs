@@ -122,9 +122,45 @@ public class RemarketingCase
     /// <summary>Share of the contract exposure attributed to this asset at default.</summary>
     public decimal ExposureAtDefault { get; set; }
     public decimal ReservePrice { get; set; }
+    /// <summary>Listing price for private sales; lowered by <see cref="PriceReductions"/> while unsold.</summary>
+    public decimal? AskingPrice { get; set; }
+    public int PriceReductions { get; set; }
     public decimal? SalePrice { get; set; }
-    /// <summary>Repossession, transport, storage, refurbishment and auction fees.</summary>
+
+    /// <summary>Auction the asset is (or was) a lot in; null for private sales and vendor buy-back.</summary>
+    public int? AuctionId { get; set; }
+    public Auction? Auction { get; set; }
+    /// <summary>Bids received at auction.</summary>
+    public int? Bids { get; set; }
+    /// <summary>Times the lot failed to reach its reserve and moved to a later auction.</summary>
+    public int TimesPassedIn { get; set; }
+
+    /// <summary>Storage yard holding the asset after repossession.</summary>
+    public string? Yard { get; set; }
+    public decimal DailyStorageRate { get; set; }
+
+    // Cost breakdown; RecoveryCosts is their sum (storage accrues until the sale).
+    public decimal TransportCost { get; set; }
+    public decimal StorageCost { get; set; }
+    public decimal RefurbishmentCost { get; set; }
+    public decimal SellingFees { get; set; }
+    /// <summary>Repossession, transport, storage, refurbishment and selling fees.</summary>
     public decimal RecoveryCosts { get; set; }
+}
+
+/// <summary>A live or online auction event; repossessed assets are offered in it as lots.</summary>
+public class Auction
+{
+    public int Id { get; set; }
+    public required string Name { get; set; }
+    public RemarketingChannel Channel { get; set; }
+    public DateOnly Date { get; set; }
+    public required string Location { get; set; }
+    public AuctionStatus Status { get; set; }
+    /// <summary>Lots that failed to reach their reserve and moved to a later auction.</summary>
+    public int LotsPassedIn { get; set; }
+
+    public List<RemarketingCase> Lots { get; set; } = [];
 }
 
 /// <summary>

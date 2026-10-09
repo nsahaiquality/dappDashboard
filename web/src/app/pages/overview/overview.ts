@@ -23,6 +23,8 @@ const EVENT_CATEGORY: Record<PortfolioEventType, Exclude<EventCategory, 'all'>> 
   RefinancingRequested: 'credit',
   RefinancingApproved: 'credit',
   RefinancingDeclined: 'credit',
+  AuctionCompleted: 'remarketing',
+  PriceReduced: 'remarketing',
 };
 
 /** Status styling: colour always paired with a text label. */
@@ -38,6 +40,8 @@ const EVENT_STYLE: Record<PortfolioEventType, { label: string; tone: string }> =
   RefinancingRequested: { label: 'Refi request', tone: 'neutral' },
   RefinancingApproved: { label: 'Refi approved', tone: 'good' },
   RefinancingDeclined: { label: 'Refi declined', tone: 'warning' },
+  AuctionCompleted: { label: 'Auction', tone: 'good' },
+  PriceReduced: { label: 'Price cut', tone: 'neutral' },
 };
 
 /** Event types added on the server later still render, with a neutral label. */
@@ -211,7 +215,7 @@ export class Overview {
 /** Revaluations carry a change in value, so they get an explicit sign. */
 function eventAmount(e: { type: PortfolioEventType; amount?: number }) {
   if (e.amount == null) return '';
-  if (e.type === 'Revaluation') return (e.amount >= 0 ? '+' : '−') + formatEurFull(Math.abs(e.amount));
+  if (e.type === 'Revaluation' || e.type === 'PriceReduced') return (e.amount >= 0 ? '+' : '−') + formatEurFull(Math.abs(e.amount));
   return formatEurFull(e.amount);
 }
 

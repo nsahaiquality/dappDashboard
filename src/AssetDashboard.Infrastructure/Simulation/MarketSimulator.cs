@@ -1,6 +1,7 @@
 using AssetDashboard.Domain;
 using AssetDashboard.Infrastructure.Dashboard;
 using AssetDashboard.Infrastructure.Data;
+using AssetDashboard.Infrastructure.Seeding;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -21,6 +22,8 @@ public enum SimulationStep
     MarketShock,
     RequestRefinancing,
     DecideRefinancing,
+    RunAuction,
+    ReducePrice,
 }
 
 public sealed class SimulatorOptions
@@ -78,8 +81,10 @@ public sealed class MarketSimulator(
         < 0.65 => SimulationStep.ReceivePayment,
         < 0.82 => SimulationStep.MissPayment,
         < 0.90 => SimulationStep.Repossess,
-        < 0.93 => SimulationStep.ListForSale,
-        < 0.96 => SimulationStep.Sell,
+        < 0.92 => SimulationStep.ListForSale,
+        < 0.94 => SimulationStep.Sell,
+        < 0.95 => SimulationStep.RunAuction,
+        < 0.96 => SimulationStep.ReducePrice,
         < 0.975 => SimulationStep.RequestRefinancing,
         < 0.99 => SimulationStep.DecideRefinancing,
         _ => SimulationStep.MarketShock,
@@ -97,6 +102,8 @@ public sealed class MarketSimulator(
         SimulationStep.MarketShock => MarketShockAsync(db, ct),
         SimulationStep.RequestRefinancing => RequestRefinancingAsync(db, ct),
         SimulationStep.DecideRefinancing => DecideRefinancingAsync(db, ct),
+        SimulationStep.RunAuction => RunAuctionAsync(db, ct),
+        SimulationStep.ReducePrice => ReducePriceAsync(db, ct),
         _ => throw new ArgumentOutOfRangeException(nameof(step)),
     };
 
@@ -183,7 +190,7 @@ public sealed class MarketSimulator(
         foreach (var asset in assets)
         {
             asset.Status = AssetStatus.Repossessed;
-            db.RemarketingCases.Add(new RemarketingCase
+            var @case = new RemarketingCase
             {
                 AssetId = asset.Id,
                 Status = RemarketingStatus.Repossessed,
@@ -191,8 +198,13 @@ public sealed class MarketSimulator(
                 RepossessedOn = today,
                 ExposureAtDefault = totalCost == 0 ? 0 : Math.Round(contract.OutstandingPrincipal * asset.OriginalCost / totalCost, 2),
                 ReservePrice = Math.Round(asset.ForcedSaleValue * 0.9m, 2),
-                RecoveryCosts = Math.Round(asset.MarketValue * (decimal)(0.03 + _rng.NextDouble() * 0.05) + 2_500, 2),
-            });
+                Yard = $"{asset.City} yard",
+                DailyStorageRate = RemarketingRules.DailyStorageRate(asset.AssetClass),
+                TransportCost = Math.Round(asset.MarketValue * (decimal)(0.01 + _rng.NextDouble() * 0.02) + 500 + _rng.Next(0, 2_000), 2),
+                RefurbishmentCost = _rng.NextDouble() < 0.5 ? Math.Round(asset.MarketValue * (decimal)(0.01 + _rng.NextDouble() * 0.04), 2) : 0,
+            };
+            @case.RecoveryCosts = @case.TransportCost + @case.RefurbishmentCost;
+            db.RemarketingCases.Add(@case);
         }
         await db.SaveChangesAsync(ct);
 
@@ -201,6 +213,7 @@ public sealed class MarketSimulator(
             contract.AssetClass, contract.Id, assets[0].Id, assets.Sum(a => a.ForcedSaleValue));
     }
 
+    /// <summary>Lists a repossessed asset: as a lot in the next auction, or privately at an asking price.</summary>
     private async Task<PortfolioEvent?> ListForSaleAsync(AssetDbContext db, CancellationToken ct)
     {
         var @case = await RandomAsync(db.RemarketingCases.Include(c => c.Asset)
@@ -210,34 +223,126 @@ public sealed class MarketSimulator(
         @case.Status = RemarketingStatus.Listed;
         @case.ListedOn = DateOnly.FromDateTime(DateTime.UtcNow);
         @case.Asset.Status = AssetStatus.InRemarketing;
+        string where;
+        if (RemarketingRules.IsAuction(@case.Channel))
+        {
+            var auction = await NextAuctionAsync(db, @case.Channel, @case.Asset.Country, ct);
+            @case.Auction = auction;
+            where = $"lot in {auction.Name}";
+        }
+        else
+        {
+            @case.AskingPrice = Math.Round(@case.Asset.MarketValue * 0.95m, 2);
+            where = $"{Humanize(@case.Channel)} at {Eur(@case.AskingPrice.Value)}";
+        }
         await db.SaveChangesAsync(ct);
 
         return new PortfolioEvent(DateTime.UtcNow, PortfolioEventType.Listed,
-            $"{@case.Asset.Category} {@case.Asset.SerialNumber} listed via {@case.Channel}, reserve {Eur(@case.ReservePrice)}",
+            $"{@case.Asset.Category} {@case.Asset.SerialNumber} listed: {where}, reserve {Eur(@case.ReservePrice)}",
             @case.Asset.AssetClass, @case.Asset.ContractId, @case.AssetId, @case.ReservePrice);
     }
 
+    /// <summary>Private sale or vendor buy-back of one listed asset (auction lots sell in <see cref="RunAuctionAsync"/>).</summary>
     private async Task<PortfolioEvent?> SellAsync(AssetDbContext db, CancellationToken ct)
     {
         var @case = await RandomAsync(db.RemarketingCases.Include(c => c.Asset).ThenInclude(a => a.Contract)
-            .Where(c => c.Status == RemarketingStatus.Listed), c => c.Id, ct);
+            .Where(c => c.Status == RemarketingStatus.Listed
+                        && (c.Channel == RemarketingChannel.PrivateSale || c.Channel == RemarketingChannel.VendorBuyBack)), c => c.Id, ct);
         if (@case is null) return null;
 
+        var price = Math.Round(@case.Asset.ForcedSaleValue * (decimal)Math.Clamp(Normal(1.0, 0.10), 0.6, 1.3), 2);
+        await CompleteSaleAsync(db, @case, price, ct);
+        await db.SaveChangesAsync(ct);
+
+        var recovery = @case.ExposureAtDefault == 0 ? 0 : (price - @case.RecoveryCosts) / @case.ExposureAtDefault;
+        return new PortfolioEvent(DateTime.UtcNow, PortfolioEventType.Sold,
+            $"{@case.Asset.Category} {@case.Asset.SerialNumber} sold via {Humanize(@case.Channel)} for {Eur(price)} (recovery {recovery.ToString("P0", Culture)})",
+            @case.Asset.AssetClass, @case.Asset.ContractId, @case.AssetId, price);
+    }
+
+    /// <summary>
+    /// Runs the earliest scheduled auction: lots with enough bidding above the reserve are sold, the rest are
+    /// passed in to the next auction. Simulated time is compressed, so the auction is dated today.
+    /// </summary>
+    private async Task<PortfolioEvent?> RunAuctionAsync(AssetDbContext db, CancellationToken ct)
+    {
+        var auction = await db.Auctions
+            .Include(a => a.Lots.Where(l => l.Status == RemarketingStatus.Listed)).ThenInclude(l => l.Asset).ThenInclude(a => a.Contract)
+            .Where(a => a.Status == AuctionStatus.Scheduled && a.Lots.Any(l => l.Status == RemarketingStatus.Listed))
+            .OrderBy(a => a.Date).ThenBy(a => a.Id)
+            .FirstOrDefaultAsync(ct);
+        if (auction is null) return null;
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        auction.Date = today;
+        auction.Status = AuctionStatus.Completed;
+        int sold = 0, passed = 0;
+        decimal hammer = 0;
+        Auction? next = null;
+        foreach (var lot in auction.Lots.ToList())
+        {
+            var bids = Math.Max(0, (int)Math.Round(Normal(8, 5)));
+            var price = Math.Round(lot.Asset.ForcedSaleValue * RemarketingRules.HammerFactor(bids, Normal(0, 0.06)), 2);
+            lot.Bids = bids;
+            if (bids == 0 || price < lot.ReservePrice)
+            {
+                // Passed in: offered again at the next auction of this channel and country.
+                next ??= await NextAuctionAsync(db, auction.Channel, lot.Asset.Country, ct, after: today);
+                lot.TimesPassedIn++;
+                lot.Auction = next;
+                passed++;
+                continue;
+            }
+            await CompleteSaleAsync(db, lot, price, ct);
+            sold++;
+            hammer += price;
+        }
+        auction.LotsPassedIn += passed;
+        await db.SaveChangesAsync(ct);
+
+        var total = sold + passed;
+        return new PortfolioEvent(DateTime.UtcNow, PortfolioEventType.AuctionCompleted,
+            $"{auction.Name}: {sold} of {total} lots sold for {Eur(hammer)}{(passed > 0 ? $", {passed} passed in" : "")}",
+            Amount: hammer);
+    }
+
+    /// <summary>An unsold private listing gets a 5% lower asking price.</summary>
+    private async Task<PortfolioEvent?> ReducePriceAsync(AssetDbContext db, CancellationToken ct)
+    {
+        var @case = await RandomAsync(db.RemarketingCases.Include(c => c.Asset)
+            .Where(c => c.Status == RemarketingStatus.Listed && c.AskingPrice != null && c.PriceReductions < 4), c => c.Id, ct);
+        if (@case is null) return null;
+
+        var before = @case.AskingPrice!.Value;
+        @case.AskingPrice = Math.Round(before * 0.95m, 2);
+        @case.PriceReductions++;
+        await db.SaveChangesAsync(ct);
+
+        return new PortfolioEvent(DateTime.UtcNow, PortfolioEventType.PriceReduced,
+            $"{@case.Asset.Category} {@case.Asset.SerialNumber}: asking price cut to {Eur(@case.AskingPrice.Value)} (reduction {@case.PriceReductions})",
+            @case.Asset.AssetClass, @case.Asset.ContractId, @case.AssetId, @case.AskingPrice.Value - before);
+    }
+
+    /// <summary>Books a sale: costs, asset value, valuation history and the effect on the contract.</summary>
+    private static async Task CompleteSaleAsync(AssetDbContext db, RemarketingCase @case, decimal price, CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
         var asset = @case.Asset;
-        var price = Math.Round(asset.ForcedSaleValue * (decimal)Math.Clamp(Normal(1.0, 0.12), 0.5, 1.4), 2);
         @case.Status = RemarketingStatus.Sold;
-        @case.SoldOn = DateOnly.FromDateTime(DateTime.UtcNow);
+        @case.SoldOn = today;
         @case.SalePrice = price;
+        RemarketingRules.ApplySaleCosts(@case, price, today);
         asset.Status = AssetStatus.Sold;
         asset.MarketValue = asset.ForcedSaleValue = price;
-        asset.LastValuedAt = DateTime.UtcNow;
+        asset.LastValuedAt = now;
         db.AssetValuations.Add(new AssetValuation
         {
-            AssetId = asset.Id, ValuedAt = DateTime.UtcNow, MarketValue = price, ForcedSaleValue = price,
+            AssetId = asset.Id, ValuedAt = now, MarketValue = price, ForcedSaleValue = price,
             Method = ValuationMethod.AuctionComparable,
         });
 
-        // Apply proceeds to the contract; once every asset is sold the remainder is written off.
+        // Apply net proceeds to the contract; once every asset is sold the remainder is written off.
         var contract = asset.Contract;
         contract.OutstandingPrincipal = Math.Max(0, contract.OutstandingPrincipal - (price - @case.RecoveryCosts));
         var anyLeft = await db.Assets.AnyAsync(a => a.ContractId == contract.Id && a.Id != asset.Id && a.Status != AssetStatus.Sold, ct);
@@ -246,13 +351,38 @@ public sealed class MarketSimulator(
             contract.OutstandingPrincipal = 0;
             contract.Status = ContractStatus.Closed;
         }
-        contract.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
+        contract.UpdatedAt = now;
+    }
 
-        var recovery = @case.ExposureAtDefault == 0 ? 0 : (price - @case.RecoveryCosts) / @case.ExposureAtDefault;
-        return new PortfolioEvent(DateTime.UtcNow, PortfolioEventType.Sold,
-            $"{asset.Category} {asset.SerialNumber} sold via {@case.Channel} for {Eur(price)} (recovery {recovery.ToString("P0", Culture)})",
-            asset.AssetClass, contract.Id, asset.Id, price);
+    /// <summary>The next scheduled auction for a channel in a country (a Thursday), created when none exists.</summary>
+    private static async Task<Auction> NextAuctionAsync(AssetDbContext db, RemarketingChannel channel, string country,
+        CancellationToken ct, DateOnly? after = null)
+    {
+        var from = after ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var suffix = $"({country})";
+        // Check auctions created earlier in this unit of work first, then the database.
+        var existing = db.Auctions.Local.FirstOrDefault(a => a.Status == AuctionStatus.Scheduled && a.Channel == channel && a.Date > from
+                                                             && (a.Location.EndsWith(", " + country) || a.Location.EndsWith(suffix)))
+                       ?? await db.Auctions
+                           .Where(a => a.Status == AuctionStatus.Scheduled && a.Channel == channel && a.Date > from
+                                       && (a.Location.EndsWith(", " + country) || a.Location.EndsWith(suffix)))
+                           .OrderBy(a => a.Date)
+                           .FirstOrDefaultAsync(ct);
+        if (existing is not null) return existing;
+
+        var date = from.AddDays(((int)DayOfWeek.Thursday - (int)from.DayOfWeek + 7) % 7);
+        if (date <= from) date = date.AddDays(7);
+        var city = AssetCatalog.Countries.FirstOrDefault(c => c.Code == country)?.Cities[0] ?? country;
+        var auction = new Auction
+        {
+            Name = $"{city} {(channel == RemarketingChannel.LiveAuction ? "Live" : "Online")} Equipment Auction {date:d MMM yyyy}",
+            Channel = channel,
+            Date = date,
+            Location = channel == RemarketingChannel.LiveAuction ? $"{city}, {country}" : $"Online ({country})",
+            Status = AuctionStatus.Scheduled,
+        };
+        db.Auctions.Add(auction);
+        return auction;
     }
 
     /// <summary>Moves the value of a whole asset class at once, e.g. a drop in used-truck prices.</summary>

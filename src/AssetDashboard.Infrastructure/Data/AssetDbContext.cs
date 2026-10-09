@@ -13,6 +13,7 @@ public class AssetDbContext(DbContextOptions<AssetDbContext> options) : DbContex
     public DbSet<RemarketingCase> RemarketingCases => Set<RemarketingCase>();
     public DbSet<PortfolioHistoryPoint> PortfolioHistory => Set<PortfolioHistoryPoint>();
     public DbSet<RefinancingRequest> RefinancingRequests => Set<RefinancingRequest>();
+    public DbSet<Auction> Auctions => Set<Auction>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -74,6 +75,15 @@ public class AssetDbContext(DbContextOptions<AssetDbContext> options) : DbContex
             e.HasIndex(x => x.AssetId).IsUnique();
             e.HasIndex(x => x.Status);
             e.HasOne(x => x.Asset).WithOne(x => x.RemarketingCase).HasForeignKey<RemarketingCase>(x => x.AssetId);
+            e.HasOne(x => x.Auction).WithMany(x => x.Lots).HasForeignKey(x => x.AuctionId);
+            e.Property(x => x.Yard).HasMaxLength(100);
+        });
+
+        b.Entity<Auction>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(150);
+            e.Property(x => x.Location).HasMaxLength(100);
+            e.HasIndex(x => new { x.Status, x.Date });
         });
 
         b.Entity<RefinancingRequest>(e =>

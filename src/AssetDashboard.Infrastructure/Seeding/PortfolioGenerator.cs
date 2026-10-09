@@ -12,8 +12,9 @@ public sealed class PortfolioGenerator(int seed = 42)
     private readonly Random _rng = new(seed);
     private int _serial;
     private readonly Dictionary<(AssetClass, int), double> _marketIndex = [];
+    private readonly Dictionary<(RemarketingChannel, string, DateOnly), Auction> _auctions = [];
 
-    public sealed record Portfolio(List<Vendor> Vendors, List<Customer> Customers, List<Contract> Contracts);
+    public sealed record Portfolio(List<Vendor> Vendors, List<Customer> Customers, List<Contract> Contracts, List<Auction> Auctions);
 
     public Portfolio Generate(int contractCount, DateTime asOfUtc)
     {
@@ -43,7 +44,8 @@ public sealed class PortfolioGenerator(int seed = 42)
         return new Portfolio(
             vendorsByClass.Values.SelectMany(v => v).ToList(),
             customersByClass.Values.SelectMany(c => c).ToList(),
-            contracts);
+            contracts,
+            _auctions.Values.OrderBy(a => a.Date).ToList());
     }
 
     private Vendor NewVendor(AssetCatalog.ClassInfo info)
@@ -197,6 +199,7 @@ public sealed class PortfolioGenerator(int seed = 42)
         var repossessedOn = Min(start.AddMonths(monthsPaid + 4).AddDays(_rng.Next(0, 60)), asOf.AddDays(-5));
         var resolved = _rng.NextDouble() < 0.35;
         var channel = Weighted(info.Channels);
+        var country = AssetCatalog.Countries.Single(c => c.Code == contract.Assets[0].Country);
 
         foreach (var asset in contract.Assets)
         {
@@ -210,8 +213,11 @@ public sealed class PortfolioGenerator(int seed = 42)
                 RepossessedOn = repossessedOn,
                 ExposureAtDefault = Math.Round(contract.OutstandingPrincipal * assetShare, 2),
                 ReservePrice = Math.Round(fsv * 0.9m, 2),
-                RecoveryCosts = Math.Round(asset.MarketValue * (decimal)Uniform(0.03, 0.08) + (decimal)Uniform(1_500, 6_000), 2),
                 Status = RemarketingStatus.Repossessed,
+                Yard = $"{Pick(country.Cities)} yard",
+                DailyStorageRate = RemarketingRules.DailyStorageRate(asset.AssetClass),
+                TransportCost = Math.Round(asset.MarketValue * (decimal)Uniform(0.01, 0.03) + (decimal)Uniform(500, 2_500), 2),
+                RefurbishmentCost = _rng.NextDouble() < 0.5 ? Math.Round(asset.MarketValue * (decimal)Uniform(0.01, 0.05), 2) : 0,
             };
             asset.Status = AssetStatus.Repossessed;
 
@@ -220,17 +226,51 @@ public sealed class PortfolioGenerator(int seed = 42)
                 @case.Status = RemarketingStatus.Listed;
                 @case.ListedOn = Min(repossessedOn.AddDays(_rng.Next(10, 40)), asOf);
                 asset.Status = AssetStatus.InRemarketing;
+                if (!RemarketingRules.IsAuction(channel))
+                {
+                    @case.PriceReductions = resolved ? _rng.Next(0, 2) : _rng.Next(0, 4);
+                    @case.AskingPrice = Math.Round(asset.MarketValue * 0.95m * (decimal)Math.Pow(0.95, @case.PriceReductions), 2);
+                }
             }
 
             if (resolved)
             {
+                DateOnly soldOn;
+                decimal price;
+                if (RemarketingRules.IsAuction(channel))
+                {
+                    var auction = AuctionFor(channel, country, Min(@case.ListedOn!.Value.AddDays(_rng.Next(7, 45)), asOf), asOf, upcoming: false);
+                    soldOn = auction.Date;
+                    @case.Auction = auction;
+                    @case.Bids = _rng.Next(2, 21);
+                    @case.TimesPassedIn = _rng.NextDouble() < 0.15 ? 1 : 0;
+                    if (_rng.NextDouble() < 0.18) auction.LotsPassedIn++;
+                    price = Math.Round(fsv * RemarketingRules.HammerFactor(@case.Bids.Value, Normal(0, 0.06)), 2);
+                }
+                else
+                {
+                    soldOn = Min(@case.ListedOn!.Value.AddDays(_rng.Next(14, 90)), asOf);
+                    price = Math.Round(fsv * (decimal)Math.Clamp(Normal(1.0, 0.10), 0.6, 1.3), 2);
+                }
                 @case.Status = RemarketingStatus.Sold;
-                @case.SoldOn = Min(@case.ListedOn!.Value.AddDays(_rng.Next(7, 60)), asOf);
-                @case.SalePrice = Math.Round(fsv * (decimal)Math.Clamp(Normal(1.0, 0.12), 0.5, 1.4), 2);
+                @case.SoldOn = soldOn;
+                @case.SalePrice = price;
+                RemarketingRules.ApplySaleCosts(@case, price, soldOn);
                 asset.Status = AssetStatus.Sold;
-                AddValuation(asset, @case.SoldOn.Value, @case.SalePrice.Value, ValuationMethod.AuctionComparable);
+                AddValuation(asset, soldOn, price, ValuationMethod.AuctionComparable);
                 // The realised price is the asset's final value, whatever the class haircut would say.
-                asset.ForcedSaleValue = asset.Valuations[^1].ForcedSaleValue = @case.SalePrice.Value;
+                asset.ForcedSaleValue = asset.Valuations[^1].ForcedSaleValue = price;
+            }
+            else
+            {
+                if (@case.Status == RemarketingStatus.Listed && RemarketingRules.IsAuction(channel))
+                {
+                    @case.Auction = AuctionFor(channel, country, asOf.AddDays(_rng.Next(1, 29)), asOf, upcoming: true);
+                    @case.TimesPassedIn = _rng.NextDouble() < 0.2 ? _rng.Next(1, 3) : 0;
+                }
+                // Costs accrued so far; selling fees only arise on sale.
+                @case.StorageCost = Math.Round((asOf.DayNumber - repossessedOn.DayNumber) * @case.DailyStorageRate, 2);
+                @case.RecoveryCosts = @case.TransportCost + @case.StorageCost + @case.RefurbishmentCost;
             }
 
             asset.RemarketingCase = @case;
@@ -242,6 +282,30 @@ public sealed class PortfolioGenerator(int seed = 42)
             contract.Status = ContractStatus.Closed;
             contract.OutstandingPrincipal = 0;
         }
+    }
+
+    /// <summary>
+    /// Auctions run on Thursdays per channel and country. Past ones are completed; upcoming ones
+    /// (after <paramref name="asOf"/>) are scheduled and collect the currently listed lots.
+    /// </summary>
+    private Auction AuctionFor(RemarketingChannel channel, AssetCatalog.CountryInfo country, DateOnly around, DateOnly asOf, bool upcoming)
+    {
+        var date = around.AddDays(((int)DayOfWeek.Thursday - (int)around.DayOfWeek + 7) % 7);
+        if (!upcoming && date > asOf) date = date.AddDays(-7);
+        if (upcoming && date <= asOf) date = date.AddDays(7);
+        var key = (channel, country.Code, date);
+        if (_auctions.TryGetValue(key, out var auction)) return auction;
+
+        var city = country.Cities[0];
+        auction = new Auction
+        {
+            Name = $"{city} {(channel == RemarketingChannel.LiveAuction ? "Live" : "Online")} Equipment Auction {date:d MMM yyyy}",
+            Channel = channel,
+            Date = date,
+            Location = channel == RemarketingChannel.LiveAuction ? $"{city}, {country.Code}" : $"Online ({country.Code})",
+            Status = date <= asOf ? AuctionStatus.Completed : AuctionStatus.Scheduled,
+        };
+        return _auctions[key] = auction;
     }
 
     /// <summary>A refinancing request in the last year, decided by the credit policy unless still open.</summary>
@@ -283,7 +347,7 @@ public sealed class PortfolioGenerator(int seed = 42)
         var age = asOf.DayNumber - requestedOn.DayNumber;
         if (contract.Status == ContractStatus.Restructured)
         {
-            Decide(request, RefinancingStatus.Approved, contract.InterestRate, "Approved as restructuring: longer term, lower installment.", 7);
+            Decide(request, RefinancingStatus.Approved, contract.InterestRate, "Approved as restructuring: longer term, lower installment.", Math.Min(7, age));
         }
         else if (age < 10)
         {

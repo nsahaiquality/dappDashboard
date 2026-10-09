@@ -104,3 +104,9 @@ public enum RefinancingStatus
     Declined,
     Withdrawn,
 }
+
+public enum AuctionStatus
+{
+    Scheduled,
+    Completed,
+}

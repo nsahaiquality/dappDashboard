@@ -46,6 +46,8 @@ public class RealTimeAndSimulatorTests(MutableApiFixture fixture)
     [InlineData(SimulationStep.MarketShock)]
     [InlineData(SimulationStep.RequestRefinancing)]
     [InlineData(SimulationStep.DecideRefinancing)]
+    [InlineData(SimulationStep.RunAuction)]
+    [InlineData(SimulationStep.ReducePrice)]
     public async Task Every_simulator_step_runs_against_postgres(SimulationStep step)
     {
         var simulator = api.Factory.Services.GetRequiredService<MarketSimulator>();

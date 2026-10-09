@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AssetDashboard.Domain;
 using AssetDashboard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -30,6 +31,7 @@ public sealed class PortfolioSeeder(AssetDbContext db, ILogger<PortfolioSeeder> 
 
         db.Vendors.AddRange(portfolio.Vendors);
         db.Customers.AddRange(portfolio.Customers);
+        db.Auctions.AddRange(portfolio.Auctions);
         await db.SaveChangesAsync(ct);
 
         foreach (var batch in portfolio.Contracts.Chunk(options.BatchSize))
@@ -41,6 +43,11 @@ public sealed class PortfolioSeeder(AssetDbContext db, ILogger<PortfolioSeeder> 
                 contract.CustomerId = contract.Customer.Id;
                 contract.Vendor = null!;
                 contract.Customer = null!;
+                foreach (var @case in contract.Assets.Select(a => a.RemarketingCase).OfType<RemarketingCase>().Where(c => c.Auction is not null))
+                {
+                    @case.AuctionId = @case.Auction!.Id;
+                    @case.Auction = null;
+                }
             }
             db.Contracts.AddRange(batch);
             await db.SaveChangesAsync(ct);
