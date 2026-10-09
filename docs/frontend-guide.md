@@ -1,0 +1,192 @@
+# Frontend guide
+
+A walkthrough of the Angular app in `web/`: how it boots, where state lives, how live data
+reaches the screen, and how to extend it. Read [architecture.md](architecture.md) first for the
+big picture.
+
+## Stack
+
+| Piece | Choice |
+|---|---|
+| Framework | Angular 22: standalone components, signals, zoneless change detection, built-in control flow (`@if`, `@for`) |
+| Routing | Angular Router with lazy-loaded pages and query-parameter input binding |
+| Real time | `@microsoft/signalr` (one connection per browser tab) |
+| HTTP | `HttpClient` with the `fetch` backend |
+| Charts | Chart.js (wrapped in one component); most bars are plain HTML/CSS |
+| Fonts | IBM Plex Sans and Mono, self-hosted through `@fontsource` (no calls to Google) |
+| Tests | Vitest (Angular's unit-test builder); Playwright end-to-end tests planned (SCRUM-73) |
+
+Run it with `npm start` (dev server on :4200). `proxy.conf.json` forwards `/api` and `/hubs`
+(WebSocket included) to the API on :5080, so the app uses relative URLs and needs no CORS.
+
+## Structure
+
+```
+web/src/
+  main.ts                 bootstraps App with appConfig
+  styles.scss             design tokens (light and dark) and all component styles
+  app/
+    app.config.ts         providers: error listeners, HttpClient (fetch), Router (input binding)
+    app.routes.ts         '' → Overview, 'assets' → Assets (both lazy-loaded)
+    app.ts / app.html     shell: sidebar navigation + <router-outlet>; starts the hub connection
+    core/                 state and data access, no UI
+      models.ts           TypeScript mirror of the API records (enums as string unions)
+      api.service.ts      REST calls; turns a filter into query parameters
+      filter.service.ts   the global filter (signal), reference data, filter chips
+      dashboard-hub.service.ts  SignalR connection; snapshot and events as signals
+      format.ts           euro, percent and number formatting; humanize enum names
+    shared/               reusable UI
+      page-header.ts      title, breadcrumb, live status, pause/resume feed, projected actions
+      filter-bar.ts       the global filter controls and the open-contracts count
+      chart.ts            Chart.js wrapper + chart theme read from CSS tokens
+      icon.ts             inline stroke icons by name
+    pages/
+      overview/           KPIs, exposure vs collateral, delinquency, recovery, vendors,
+                          refinancing watchlist, countries, live events, CSV export
+      assets/             asset explorer: search, status, sort, paging, CSV export, detail panel
+```
+
+```mermaid
+flowchart TB
+    subgraph pages
+        overview["Overview page"]
+        assets["Assets page"]
+    end
+    subgraph shared
+        header["PageHeader"]
+        filterbar["FilterBar"]
+        chart["ChartComponent"]
+    end
+    subgraph core
+        filter["FilterService<br/><i>filter signal</i>"]
+        hub["DashboardHubService<br/><i>snapshot, events, state signals</i>"]
+        api["ApiService<br/><i>REST</i>"]
+    end
+    overview --> header & filterbar & hub & filter
+    assets --> header & filterbar & chart & api & filter
+    filterbar --> filter
+    header --> hub & api
+    hub --> filter
+    hub -- "WebSocket" --> server[("API /hubs/dashboard")]
+    api -- "HTTP" --> rest[("API /api/*")]
+    filter --> api
+```
+
+## State: three services, all signals
+
+The app is zoneless: the screen updates when a signal it reads changes. All shared state is in
+three root services.
+
+**`FilterService`** holds the global filter as a signal (`filter`), plus `reference` (vendors and
+countries for the dropdowns, loaded once), `chips` (removable labels for the active filter) and
+`summary` (the breadcrumb text). Change it with `patch({...})`, `toggle(key, value)` (click once
+to filter, again to clear: the drill-down behaviour) or `reset()`. Every page reads the same
+filter, so a filter set on the overview still applies on the asset explorer.
+
+**`DashboardHubService`** owns the one SignalR connection.
+
+- `snapshot` holds the latest `PortfolioSnapshot`; `events` the last 100 events, newest first;
+  `state` the connection state (connecting, connected, reconnecting, disconnected).
+- An `effect` sends `SetFilter(filter)` whenever the filter changes, and again after every
+  reconnect (a new connection starts unfiltered on the server).
+- A snapshot whose `filter` does not match the current filter is ignored, so a late message for
+  the previous filter never overwrites the new one. `pending` is true until the matching snapshot
+  arrives; the filter bar shows a progress line and the page dims meanwhile.
+- If the connection drops, SignalR reconnects automatically; if it closes, the service retries
+  every 5 seconds.
+
+**`ApiService`** wraps the REST endpoints (reference data, asset list, asset detail, CSV export
+URL, simulator state). `filterParams` turns the filter into query parameters; only set values are
+sent.
+
+## Pages
+
+### Overview (`pages/overview`)
+
+Everything on the page derives from `hub.snapshot` through `computed` signals that build small
+view models: KPI cards with their context bars, class rows with bar widths scaled to the largest
+value, past-due composition, recovery bars, top vendors, and the watchlist (classes with LTV above
+100%). The page fetches nothing itself; it redraws whenever a new snapshot arrives.
+
+- **Drill-down:** clicking an asset class row, a vendor or a country chip calls
+  `filters.toggle(...)`. The hub service sends the new filter and the matching snapshot replaces
+  the page's data.
+- **Live events:** `hub.events`, narrowed by the category buttons (Credit, Valuations,
+  Remarketing) and by the asset-class filter. Labels and colours come from `EVENT_STYLE`; event
+  types the page does not know still render with a neutral label.
+- **Export** builds a CSV of the KPIs, asset classes and delinquency in the browser.
+- "View past-due contracts" links to `/assets?sort=DaysPastDue`.
+
+### Asset explorer (`pages/assets`)
+
+- A `query` computed signal combines the global filter, status, search, sort and page; an
+  `effect` reloads the list whenever it changes. A request counter drops responses that arrive
+  after a newer request, so fast typing never shows stale rows.
+- Search is debounced by 300 ms; changing the global filter returns to page 1.
+- The initial sort can come from the URL (`?sort=DaysPastDue`) through router input binding.
+- Selecting a row loads `/api/assets/{id}`. The detail panel shows the facts, a Chart.js line
+  chart of market value, forced sale value and the asset's share of the exposure over time, and a
+  plain-language collateral-cover sentence.
+- Export CSV links to `/api/assets/export` with the same query, so the file matches the table.
+
+## Shared components
+
+| Component | Notes |
+|---|---|
+| `PageHeader` | Breadcrumb shows the filter summary; live pill shows Live, Paused, Reconnecting or Offline with the last update time; pause/resume calls the simulator endpoints; page actions are projected with `<ng-content>` |
+| `FilterBar` | Segmented "All contracts / Underwater only", dropdowns for class, country, vendor, product; "Clear filters"; open contracts and assets from the snapshot |
+| `ChartComponent` | Creates the Chart.js instance once and updates it in place when the `config` input changes; destroyed with the component. `chartTheme()` and `baseOptions()` read colours from the CSS tokens, so charts follow light and dark mode |
+| `Icon` | Inline SVG paths by name; decorative (`aria-hidden`), always next to text or inside a labelled button |
+
+## Styling
+
+`styles.scss` defines design tokens as CSS custom properties: surfaces, text, borders, the two
+series colours, status colours, the sidebar. Dark mode redefines the same tokens (following the
+operating system, or `data-theme` on `<html>`). Components use the tokens, never raw colours.
+
+Conventions behind the look:
+
+- Series colours (exposure blue, collateral orange) come from a colour-blind-safe palette.
+- Status colour is never the only signal: pills always carry a text label (Default, Missed
+  payment, Sold); underwater LTV also shows an arrow icon.
+- Numbers use tabular figures in tables and KPI cards so columns line up.
+- Below 960 px the sidebar becomes a top bar; below 640 px fields stack and tables scroll inside
+  their card, so the page never scrolls sideways.
+
+## Data contracts
+
+`core/models.ts` mirrors the API records by hand: same property names (camelCase), enums as
+string unions (`'Agriculture' | 'Construction' | ...`). When an API record changes, change it here
+too. SCRUM-72 replaces the hand-written types with types generated from the OpenAPI document,
+plus a check that fails when they drift.
+
+## Recipes
+
+### Add a page
+
+1. Create `pages/<name>/<name>.ts` and `.html` as a standalone component; use `PageHeader` and
+   `FilterBar`.
+2. Add a lazy route in `app.routes.ts` and give its sidebar entry a `link` in `app.ts`.
+3. Read the filter from `FilterService`; call the page's endpoint through `ApiService` (add a
+   method and its types in `models.ts`).
+4. Derive view models with `computed`; reload with an `effect` on a query signal (see the asset
+   explorer).
+
+### Add a KPI to the overview
+
+The value must exist on `PortfolioSnapshot` (backend first). Then add an entry to the `kpis`
+computed in `overview.ts`: label, formatted value, sub-line and its context bar segments.
+
+### Add a live event type
+
+Add it to `PortfolioEventType` in `models.ts`, then to `EVENT_CATEGORY` and `EVENT_STYLE` in
+`overview.ts` (label and tone: neutral, good, warning, serious, critical).
+
+## Accessibility
+
+- Real `<button>`, `<a>`, `<label>` and `<select>` elements throughout, so keyboard and screen
+  readers work without extra code. Toggle buttons expose `aria-pressed`; the active nav link
+  `aria-current`.
+- The live events list is an `aria-live="polite"` region; charts carry `role="img"` and a label.
+- Focus is visible (`:focus-visible` outline in the accent colour).
+- A full WCAG AA audit with automated checks is planned (SCRUM-59, through the end-to-end tests).

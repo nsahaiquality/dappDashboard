@@ -1,6 +1,9 @@
 using AssetDashboard.Domain;
 using AssetDashboard.Infrastructure.Dashboard;
+using AssetDashboard.Infrastructure.Data;
 using AssetDashboard.Infrastructure.Refinancing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AssetDashboard.IntegrationTests;
 
@@ -61,5 +64,32 @@ public class RefinancingApiTests(ApiFixture api)
             Assert.InRange(c.LossGivenDefault, 0m, 1m);
             Assert.True(c.ExpectedLoss <= c.Exposure);
         });
+    }
+
+    /// <summary>
+    /// The summary computes expected loss in SQL (PD as a CASE expression); the domain rule computes it in C#.
+    /// Recomputing every open contract with CreditRisk.ExpectedLoss must give the same total.
+    /// </summary>
+    [Fact]
+    public async Task Sql_expected_loss_matches_the_domain_rule_contract_by_contract()
+    {
+        var summary = await api.GetAsync<RefinancingSummary>("/api/refinancing/summary");
+
+        await using var scope = api.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AssetDbContext>();
+        var contracts = await db.Contracts.AsNoTracking()
+            .Where(c => c.Status != ContractStatus.Closed)
+            .Select(c => new
+            {
+                c.OutstandingPrincipal,
+                c.DaysPastDue,
+                c.Customer.RiskGrade,
+                Forced = c.Assets.Where(a => a.Status != AssetStatus.Sold).Sum(a => a.ForcedSaleValue),
+            })
+            .ToListAsync();
+        var expected = contracts.Sum(c => CreditRisk.ExpectedLoss(c.OutstandingPrincipal, c.Forced, c.RiskGrade, c.DaysPastDue));
+
+        // C# rounds LGD to 4 decimals and each contract to cents; allow 0.1% for that rounding.
+        Assert.InRange(summary!.ExpectedLoss, expected * 0.999m, expected * 1.001m);
     }
 }

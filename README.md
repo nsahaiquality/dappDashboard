@@ -36,7 +36,7 @@ tests/
   AssetDashboard.Tests/           xUnit unit tests (domain maths, generator realism, filters)
   AssetDashboard.IntegrationTests/ Real API + Postgres via Testcontainers (every query, hub, simulator)
 web/                              Angular 22 frontend (signals, zoneless, router, Chart.js, @microsoft/signalr, IBM Plex)
-docs/                             Architecture and domain model
+docs/                             Architecture, backend and frontend guides, domain model, ADRs
 backlog/                          Jira import file (epics + tasks)
 docker-compose.yml                PostgreSQL (+ optional pgAdmin)
 ```
@@ -112,4 +112,10 @@ cd web && npx ng build                         # frontend build check
 dotnet ef migrations add <Name> -p src/AssetDashboard.Infrastructure -s src/AssetDashboard.Infrastructure -o Data/Migrations
 ```
 
-See [docs/architecture.md](docs/architecture.md) and [docs/domain-model.md](docs/domain-model.md).
+## Documentation
+
+See [docs/README.md](docs/README.md) for the full map:
+[architecture](docs/architecture.md) (C4 diagrams, live update flow),
+[backend guide](docs/backend-guide.md), [frontend guide](docs/frontend-guide.md),
+[domain model](docs/domain-model.md) and [decision records](docs/adr/README.md).
+The API is documented interactively at `http://localhost:5080/swagger`.
