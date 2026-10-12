@@ -89,7 +89,7 @@ public static class Endpoints
                 }, "text/csv; charset=utf-8");
             })
             .WithSummary("Export assets as CSV")
-            .WithDescription($"Same query as 'List assets', streamed as a CSV download (up to {MaxExportRows:N0} rows)." + FilterNote)
+            .WithDescription(string.Create(CultureInfo.InvariantCulture, $"Same query as 'List assets', streamed as a CSV download (up to {MaxExportRows:N0} rows).") + FilterNote)
             .Produces(StatusCodes.Status200OK, contentType: "text/csv");
 
         g.MapGet("/{id:long}", async ([Description("Asset id.")] long id, PortfolioStatsService stats, CancellationToken ct) =>

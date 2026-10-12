@@ -209,7 +209,7 @@
           "Assets"
         ],
         "summary": "Export assets as CSV",
-        "description": "Same query as \u0027List assets\u0027, streamed as a CSV download (up to 100.000 rows). Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).",
+        "description": "Same query as \u0027List assets\u0027, streamed as a CSV download (up to 100,000 rows). Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).",
         "parameters": [
           {
             "name": "AssetClass",

@@ -162,7 +162,7 @@ export interface paths {
         };
         /**
          * Export assets as CSV
-         * @description Same query as 'List assets', streamed as a CSV download (up to 100.000 rows). Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).
+         * @description Same query as 'List assets', streamed as a CSV download (up to 100,000 rows). Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).
          */
         get: {
             parameters: {
