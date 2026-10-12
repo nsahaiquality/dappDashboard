@@ -2120,7 +2120,8 @@
           "AuctionCompleted",
           "PriceReduced",
           "DataLoadFailed",
-          "DataLoadRecovered"
+          "DataLoadRecovered",
+          "NewBusiness"
         ],
         "type": "string"
       },

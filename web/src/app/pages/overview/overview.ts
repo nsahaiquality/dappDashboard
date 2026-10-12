@@ -35,6 +35,7 @@ const EVENT_CATEGORY: Record<PortfolioEventType, Exclude<EventCategory, 'all'>> 
   PriceReduced: 'remarketing',
   DataLoadFailed: 'data',
   DataLoadRecovered: 'data',
+  NewBusiness: 'credit',
 };
 
 /** Status styling: colour always paired with a text label. */
@@ -54,6 +55,7 @@ const EVENT_STYLE: Record<PortfolioEventType, { label: string; tone: string }> =
   PriceReduced: { label: 'Price cut', tone: 'neutral' },
   DataLoadFailed: { label: 'Load failed', tone: 'critical' },
   DataLoadRecovered: { label: 'Load recovered', tone: 'good' },
+  NewBusiness: { label: 'New business', tone: 'good' },
 };
 
 /** Event types added on the server later still render, with a neutral label. */
