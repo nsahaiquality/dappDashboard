@@ -17,6 +17,13 @@ public sealed class ApiFixture : IAsyncLifetime
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
 
+    private readonly IReadOnlyDictionary<string, string> _settings;
+
+    public ApiFixture() : this(new Dictionary<string, string>()) { }
+
+    /// <summary>Extra configuration for a fixture that needs it (e.g. a fixed simulator seed).</summary>
+    internal ApiFixture(IReadOnlyDictionary<string, string> settings) => _settings = settings;
+
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;
 
@@ -40,6 +47,7 @@ public sealed class ApiFixture : IAsyncLifetime
             b.UseSetting("History:BackfillDays", "120");
             b.UseSetting("Sources:HistoryDays", "10");
             b.UseSetting("Sources:Enabled", "false");
+            foreach (var (key, value) in _settings) b.UseSetting(key, value);
         });
         Client = Factory.CreateClient();
     }
