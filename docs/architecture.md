@@ -52,7 +52,8 @@ flowchart LR
 | Web app | Angular 22 (standalone components, signals, zoneless), Chart.js, `@microsoft/signalr` | Screens, filters, charts; keeps one SignalR connection | `npm start` (dev server on :4200, proxies `/api` and `/hubs`) |
 | API | .NET 10, ASP.NET Core minimal APIs, SignalR, EF Core 10 + Npgsql | REST endpoints, live push, statistics, simulators, seeding | `dotnet run --project src/AssetDashboard.Api` (:5080) |
 | API documentation | Microsoft.AspNetCore.OpenApi, Swashbuckle Swagger UI | Generated from the endpoint metadata; try-it-out | Same process, `/swagger` |
-| Database | PostgreSQL 17 | Read model: contracts, assets, valuations, recoveries, history, loads | `docker compose up -d` |
+| Database | PostgreSQL 17 | Read model: contracts, assets, valuations, recoveries, history, loads | `docker compose up -d`, or by the Aspire AppHost |
+| Orchestration | .NET Aspire 13 (AppHost, ServiceDefaults) | Starts everything together; dashboard for traces, metrics, logs | `dotnet run --project src/AssetDashboard.AppHost` |
 
 ## Level 3: Components of the API
 
@@ -210,6 +211,23 @@ the local Postgres database. Options for the real integration, roughly in order 
 In every case, the integration only needs to (a) keep the read model in Postgres up to date and
 (b) call `IPortfolioEventSink.PublishAsync`. Screens, endpoints and the real-time pipeline stay
 unchanged.
+
+## Observability
+
+`AssetDashboard.ServiceDefaults` (referenced by the API) configures OpenTelemetry for logs, traces
+and metrics, and the health endpoints `/health` and `/alive`. Telemetry is exported over OTLP when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set, which the Aspire AppHost does; in production the same export
+can go to Azure Monitor, Grafana or any OTLP backend.
+
+| Signal | Sources |
+|---|---|
+| Traces | ASP.NET Core requests, SignalR hub calls, SQL (Npgsql), and the app's own spans: `snapshot.recompute` (tagged with the filter), `simulator.step` |
+| Metrics | ASP.NET Core, Kestrel, SignalR connections, Npgsql, .NET runtime, and the app's own (`AssetDashboardTelemetry`): `assetdashboard.snapshot.duration`, `.snapshots.sent`, `.events.published`, `.filters.active`, `.simulator.steps`, `.source.loads` |
+| Logs | All `ILogger` output, structured, correlated with traces |
+
+`AssetDashboard.AppHost` starts PostgreSQL, the API and the Angular app together and shows all of
+this in the Aspire dashboard. A trace of one snapshot recompute shows its ten SQL queries and their
+timings, which is how slow queries are found.
 
 ## Large datasets
 

@@ -11,8 +11,13 @@ using AssetDashboard.Infrastructure.Vendors;
 using AssetDashboard.Infrastructure.Seeding;
 using AssetDashboard.Infrastructure.Simulation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Aspire service defaults: OpenTelemetry (traces, metrics, logs), health checks, service discovery, resilience.
+builder.AddServiceDefaults();
 
 builder.Services.AddDbContext<AssetDbContext>(o =>
     o.UseNpgsql(builder.Configuration.GetConnectionString("AssetDb")));
@@ -73,7 +78,6 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((document, _, _) =>
     }
     return Task.CompletedTask;
 }));
-builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
@@ -81,6 +85,9 @@ if (app.Configuration.GetValue("Database:MigrateOnStartup", false))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<AssetDbContext>();
+    // Create EF's history table first: on an empty database, migrating otherwise logs a (harmless)
+    // failed query against the missing table, which shows up as an error in the Aspire dashboard.
+    await db.GetService<IHistoryRepository>().CreateIfNotExistsAsync();
     await db.Database.MigrateAsync();
 
     var seed = app.Configuration.GetSection("Seed").Get<SeedOptions>() ?? new SeedOptions();
@@ -109,7 +116,7 @@ if (app.Configuration.GetValue("ApiDocs:Enabled", true))
     app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 }
 
-app.MapHealthChecks("/health");
+app.MapDefaultEndpoints(); // /health and /alive
 app.MapDashboardApi();
 app.MapHub<DashboardHub>("/hubs/dashboard");
 

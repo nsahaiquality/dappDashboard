@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AssetDashboard.Infrastructure\AssetDashboard.Infrastructure.csproj" />
     <ProjectReference Include="..\AssetDashboard.Domain\AssetDashboard.Domain.csproj" />
+    <ProjectReference Include="..\AssetDashboard.ServiceDefaults\AssetDashboard.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>

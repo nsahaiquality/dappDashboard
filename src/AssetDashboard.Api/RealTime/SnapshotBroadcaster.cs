@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
+using AssetDashboard.Infrastructure;
 using AssetDashboard.Infrastructure.Dashboard;
 using Microsoft.AspNetCore.SignalR;
 
@@ -57,6 +59,7 @@ public sealed class SnapshotBroadcaster(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        AssetDashboardTelemetry.ObserveActiveFilters(() => _entries.Count);
         // The unfiltered snapshot is always kept warm for REST callers and new connections.
         _entries.GetOrAdd(PortfolioFilter.None.Key, _ => new Entry(PortfolioFilter.None)).Watchers++;
 
@@ -74,15 +77,22 @@ public sealed class SnapshotBroadcaster(
                 var stale = entry.Latest is null || DateTime.UtcNow - entry.Latest.GeneratedAt > MaxAge;
                 if (!dirty && !stale) continue;
 
+                using var activity = AssetDashboardTelemetry.ActivitySource.StartActivity("snapshot.recompute");
+                activity?.SetTag("assetdashboard.filter", key);
+                var started = Stopwatch.GetTimestamp();
                 try
                 {
                     await using var scope = scopeFactory.CreateAsyncScope();
                     var stats = scope.ServiceProvider.GetRequiredService<PortfolioStatsService>();
                     entry.Latest = await stats.GetSnapshotAsync(entry.Filter, stoppingToken);
+                    AssetDashboardTelemetry.SnapshotDuration.Record(Stopwatch.GetElapsedTime(started).TotalMilliseconds,
+                        new KeyValuePair<string, object?>("filter", key));
                     await hub.Clients.Group(key).Snapshot(entry.Latest);
+                    AssetDashboardTelemetry.SnapshotsSent.Add(1);
                 }
                 catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
                 {
+                    activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                     logger.LogWarning(ex, "Snapshot refresh failed for {Filter}", key);
                     MarkDirty();
                 }

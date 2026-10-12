@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using AssetDashboard.Infrastructure;
 using AssetDashboard.Infrastructure.Dashboard;
 using AssetDashboard.Infrastructure.Simulation;
 using Microsoft.AspNetCore.SignalR;
@@ -17,6 +18,7 @@ public sealed class SignalREventSink(IHubContext<DashboardHub, IDashboardClient>
         _recent.Enqueue(portfolioEvent);
         while (_recent.Count > RecentCapacity) _recent.TryDequeue(out _);
 
+        AssetDashboardTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("type", portfolioEvent.Type.ToString()));
         broadcaster.MarkDirty();
         await hub.Clients.All.PortfolioEvent(portfolioEvent);
     }

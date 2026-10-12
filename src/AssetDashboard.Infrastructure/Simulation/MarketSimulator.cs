@@ -59,9 +59,11 @@ public sealed class MarketSimulator(
             if (_paused) continue;
             try
             {
+                using var activity = AssetDashboardTelemetry.ActivitySource.StartActivity("simulator.step");
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var db = scope.ServiceProvider.GetRequiredService<AssetDbContext>();
                 var evt = await NextEventAsync(db, stoppingToken);
+                activity?.SetTag("assetdashboard.event", evt?.Type.ToString() ?? "none");
                 if (evt is not null) await sink.PublishAsync(evt, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -91,7 +93,13 @@ public sealed class MarketSimulator(
     }, ct);
 
     /// <summary>Runs one specific kind of change; used by the loop above and by integration tests.</summary>
-    public Task<PortfolioEvent?> StepAsync(AssetDbContext db, SimulationStep step, CancellationToken ct = default) => step switch
+    public Task<PortfolioEvent?> StepAsync(AssetDbContext db, SimulationStep step, CancellationToken ct = default)
+    {
+        AssetDashboardTelemetry.SimulatorSteps.Add(1, new KeyValuePair<string, object?>("step", step.ToString()));
+        return RunStepAsync(db, step, ct);
+    }
+
+    private Task<PortfolioEvent?> RunStepAsync(AssetDbContext db, SimulationStep step, CancellationToken ct) => step switch
     {
         SimulationStep.Revalue => RevalueAsync(db, ct),
         SimulationStep.ReceivePayment => ReceivePaymentAsync(db, ct),

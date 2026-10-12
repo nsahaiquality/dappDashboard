@@ -27,6 +27,8 @@ src/
     Sources/                        SourceService, SourceFeedSimulator, SourceCatalog
     Simulation/                     MarketSimulator, IPortfolioEventSink
     Seeding/                        AssetCatalog, PortfolioGenerator, PortfolioSeeder, BulkCopy
+  AssetDashboard.AppHost/           .NET Aspire orchestration: Postgres, API, Angular; dashboard
+  AssetDashboard.ServiceDefaults/   OpenTelemetry, health checks, resilience (used by the API)
   AssetDashboard.Api/               transport and hosting only
     Program.cs                      dependency injection, startup, API docs, routes
     Endpoints.cs                    /api/* grouped by area, with OpenAPI metadata
@@ -38,19 +40,21 @@ tests/
 
 ## Startup: what `Program.cs` does, in order
 
-1. **Registers services.** `AssetDbContext` (Npgsql), one scoped read service per screen, the
+1. **Adds the Aspire service defaults** (`AddServiceDefaults`): OpenTelemetry, health checks,
+   service discovery, HTTP resilience.
+2. **Registers services.** `AssetDbContext` (Npgsql), one scoped read service per screen, the
    options classes (`Seed`, `Simulator`, `History`, `Sources`), and four background services:
    `SnapshotBroadcaster`, `MarketSimulator`, `HistoryRecorder`, `SourceFeedSimulator`.
    `SnapshotBroadcaster`, `SignalREventSink` and `MarketSimulator` are singletons registered both
    as themselves and as hosted services, so the hub and endpoints can call them directly.
-2. **Configures JSON.** Enums travel as strings (`JsonStringEnumConverter`) over HTTP and SignalR;
+3. **Configures JSON.** Enums travel as strings (`JsonStringEnumConverter`) over HTTP and SignalR;
    numbers are strict, so OpenAPI documents them as numbers.
-3. **Prepares the database** when `Database:MigrateOnStartup` is true (Development): applies
+4. **Prepares the database** when `Database:MigrateOnStartup` is true (Development): applies
    migrations, seeds an empty database (`PortfolioSeeder`), backfills history and seeds the source
    systems. Each step does nothing if its data already exists.
-4. **Maps the API documentation** (`/openapi/v1.json`, `/swagger`, `/` redirects) unless
+5. **Maps the API documentation** (`/openapi/v1.json`, `/swagger`, `/` redirects) unless
    `ApiDocs:Enabled` is false.
-5. **Maps routes:** `/health`, `/api/*` (`Endpoints.MapDashboardApi`), `/hubs/dashboard`.
+6. **Maps routes:** `/health` and `/alive` (`MapDefaultEndpoints`), `/api/*` (`Endpoints.MapDashboardApi`), `/hubs/dashboard`.
 
 Configuration lives in `appsettings.Development.json`; every key is listed in the
 [README](../README.md#configuration-srcassetdashboardapiappsettingsdevelopmentjson). Override any
@@ -209,11 +213,18 @@ publishes through the same interface ([architecture.md](architecture.md#from-sim
 ## Running and debugging
 
 ```bash
+dotnet run --project src/AssetDashboard.AppHost       # everything + Aspire dashboard (localhost:15101)
+
 docker compose up -d                                   # Postgres
 dotnet run --project src/AssetDashboard.Api            # API on :5080, Swagger at /swagger
 dotnet test tests/AssetDashboard.Tests                 # unit tests
 dotnet test tests/AssetDashboard.IntegrationTests      # needs Docker
 ```
 
-To start from a fresh database: `docker compose down -v`, then run the API again. Pause the
-simulator from the dashboard or with `POST /api/simulator/pause` when debugging a query.
+To start from a fresh database: `docker compose down -v` (or remove the `assetdash-aspire-pgdata17`
+volume when using Aspire), then run again. Pause the simulator from the dashboard or with
+`POST /api/simulator/pause` when debugging a query.
+
+**Finding a slow query:** run under Aspire, open Traces, pick a `snapshot.recompute` (or any
+request) and expand it: each SQL statement is a child span with its duration and text. Custom
+spans and metrics are defined in `Infrastructure/AssetDashboardTelemetry.cs`.

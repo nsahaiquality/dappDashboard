@@ -32,6 +32,8 @@ src/
   AssetDashboard.Infrastructure/  EF Core (Postgres), migrations, synthetic data generator,
                                   statistics queries, market simulator
   AssetDashboard.Api/             ASP.NET Core minimal API, SignalR hub, snapshot broadcaster
+  AssetDashboard.AppHost/         .NET Aspire: runs Postgres + API + Angular, dashboard with traces/metrics/logs
+  AssetDashboard.ServiceDefaults/ OpenTelemetry, health checks (/health, /alive), resilience
 tests/
   AssetDashboard.Tests/           xUnit unit tests (domain maths, generator realism, filters)
   AssetDashboard.IntegrationTests/ Real API + Postgres via Testcontainers (every query, hub, simulator)
@@ -50,6 +52,20 @@ docker-compose.yml                PostgreSQL (+ optional pgAdmin)
 | Docker runtime | any (Docker Desktop puts its CLI in `~/.docker/bin`; open a new terminal if `docker` isn't found) | [Docker Desktop](https://www.docker.com/products/docker-desktop/), [OrbStack](https://orbstack.dev) or `brew install colima docker docker-compose && colima start` |
 
 ## Running locally
+
+### Everything at once (recommended): .NET Aspire
+
+```bash
+dotnet run --project src/AssetDashboard.AppHost
+```
+
+This starts PostgreSQL 17 (its own container and volume), the API (seeded on first start) and the
+Angular app, and opens the **Aspire dashboard** at http://localhost:15101. There you can see every
+resource, its logs, and live **traces** (one click from a snapshot recompute to its SQL queries)
+and **metrics** (snapshot recompute time per filter, events, simulator steps, source loads). The
+app is at http://localhost:4200 and the API docs at http://localhost:5080/swagger, as below.
+
+### Step by step
 
 ```bash
 # 1. Database
