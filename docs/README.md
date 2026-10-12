@@ -9,6 +9,7 @@ Start with the document that matches your question.
 | Work on the .NET code | [backend-guide.md](backend-guide.md): layout, startup, data access rules, real time, recipes |
 | Work on the Angular code | [frontend-guide.md](frontend-guide.md): structure, state, pages, styling, recipes |
 | Understand the business data | [domain-model.md](domain-model.md): entities, terms (LTV, PD, LGD), synthetic data assumptions |
+| Know how quality is proven | [testing.md](testing.md): four test levels (236 tests), coverage by endpoint, evidence per run |
 | Know why something was built this way | [adr/](adr/README.md): eight architecture decision records |
 | Call the API | `http://localhost:5080/swagger` when the backend runs (every endpoint, try-it-out) |
 | Run the project | [../README.md](../README.md) |
