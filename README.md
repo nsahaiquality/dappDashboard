@@ -128,6 +128,7 @@ dotnet test tests/AssetDashboard.IntegrationTests # API + queries against a thro
 dotnet test tests/AssetDashboard.EndToEndTests   # whole system via Aspire + Playwright (Docker; stop any running AppHost first)
 UPDATE_API_CONTRACT=1 dotnet test tests/AssetDashboard.IntegrationTests --filter ApiContractTests  # accept an API change
 cd web && npm run api:generate                   # regenerate frontend types from contracts/openapi.v1.json
+cd web && npm run test:ci                         # frontend unit tests (Vitest) with coverage
 cd web && npx ng build                         # frontend build check
 dotnet ef migrations add <Name> -p src/AssetDashboard.Infrastructure -s src/AssetDashboard.Infrastructure -o Data/Migrations
 ```

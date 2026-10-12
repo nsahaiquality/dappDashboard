@@ -74,6 +74,9 @@ flowchart TB
 
 ## State: three services, all signals
 
+(The SignalR connection is created through the `HUB_CONNECTION_FACTORY` injection token, so tests can
+provide a fake.)
+
 The app is zoneless: the screen updates when a signal it reads changes. All shared state is in
 three root services.
 
@@ -196,6 +199,23 @@ computed in `overview.ts`: label, formatted value, sub-line and its context bar 
 After the backend adds it, update the contract and regenerate (see Data contracts); then add it to
 `EVENT_CATEGORY` and `EVENT_STYLE` in `overview.ts` (label and tone: neutral, good, warning,
 serious, critical).
+
+## Tests
+
+Unit tests run with Vitest through Angular's test builder (`npm test`, or `npm run test:ci` once
+with coverage into `web/coverage/`). Specs sit next to the code (`*.spec.ts`); shared doubles are
+in `src/testing/fakes.ts`.
+
+| What | How it is tested |
+|---|---|
+| Formatting, filter equality | Pure functions, direct assertions |
+| `FilterService` | Real service with a stubbed `ApiService` |
+| `DashboardHubService` | Real service with `FakeHubConnection` (injected through `HUB_CONNECTION_FACTORY`): filter sent on connect, on change and after reconnect; stale snapshots ignored; event cap |
+| `ApiService` | `HttpTestingController`: exact query parameters and URLs |
+| Overview, Assets pages | Rendered with `TestBed`; snapshot pushed through the fake connection; clicks, chips, stale-response handling |
+
+The Chart.js wrapper and the real network paths are covered by the end-to-end tests
+(`tests/AssetDashboard.EndToEndTests`), which drive the whole system in Chromium.
 
 ## Accessibility
 

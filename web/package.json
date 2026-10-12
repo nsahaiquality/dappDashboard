@@ -8,7 +8,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "api:generate": "npx --yes openapi-typescript@7.13.0 ../contracts/openapi.v1.json -o src/app/core/api.generated.ts",
-    "api:check": "npx --yes openapi-typescript@7.13.0 ../contracts/openapi.v1.json -o .api.generated.check.ts && diff -q src/app/core/api.generated.ts .api.generated.check.ts && rm .api.generated.check.ts"
+    "api:check": "npx --yes openapi-typescript@7.13.0 ../contracts/openapi.v1.json -o .api.generated.check.ts && diff -q src/app/core/api.generated.ts .api.generated.check.ts && rm .api.generated.check.ts",
+    "test:ci": "ng test --watch=false --coverage"
   },
   "private": true,
   "packageManager": "npm@11.19.1",
@@ -30,6 +31,7 @@
     "@angular/build": "^22.2.2",
     "@angular/cli": "^22.2.2",
     "@angular/compiler-cli": "^22.2.0",
+    "@vitest/coverage-v8": "^5.0.3",
     "jsdom": "^30.0.0",
     "prettier": "^3.8.1",
     "typescript": "~6.0.2",
