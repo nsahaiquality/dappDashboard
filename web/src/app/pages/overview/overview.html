@@ -174,7 +174,7 @@
           }
         </div>
       </div>
-      <ol class="events" aria-live="polite">
+      <ol class="events" aria-live="polite" aria-label="Live events, newest first" tabindex="0">
         @for (e of events(); track e) {
           <li>
             <time class="mono">{{ e.at | date: 'HH:mm:ss' }}</time>

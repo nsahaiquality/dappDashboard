@@ -15,6 +15,9 @@
   --baseline: #c3c8d1;
   --accent: #1f5fbf;
   --accent-hover: #174a96;
+  // Fill behind white text (primary buttons): needs 4.5:1 against white, so it is darker than --accent in dark mode.
+  --accent-fill: #1f5fbf;
+  --accent-fill-hover: #174a96;
   --accent-soft: #eaf1fc;
   --accent-ink: #1f4e96;
   --series-1: #2a78d6;
@@ -60,6 +63,8 @@
   --baseline: #3a4658;
   --accent: #4d8ff0;
   --accent-hover: #6ea4f4;
+  --accent-fill: #2f6fd1; // white text 4.87:1
+  --accent-fill-hover: #2a66c4;
   --accent-soft: #1b2c47;
   --accent-ink: #a9c8f7;
   --series-1: #3987e5;
@@ -401,11 +406,11 @@ button {
     cursor: default;
   }
   &.primary {
-    background: var(--accent);
-    border-color: var(--accent);
+    background: var(--accent-fill);
+    border-color: var(--accent-fill);
     color: #fff;
     &:hover:not(:disabled) {
-      background: var(--accent-hover);
+      background: var(--accent-fill-hover);
       color: #fff;
     }
   }

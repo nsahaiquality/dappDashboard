@@ -37,6 +37,7 @@ src/
 tests/
   AssetDashboard.Tests/           xUnit unit tests (domain maths, generator realism, filters)
   AssetDashboard.IntegrationTests/ Real API + Postgres via Testcontainers (every query, hub, simulator)
+  AssetDashboard.EndToEndTests/   Whole system (Aspire) in a real browser (Playwright): journeys, numbers vs DB, real time, WCAG AA
 web/                              Angular 22 frontend (signals, zoneless, router, Chart.js, @microsoft/signalr, IBM Plex)
 docs/                             Architecture, backend and frontend guides, domain model, ADRs
 backlog/                          Jira import file (epics + tasks)
@@ -124,6 +125,7 @@ portfolio: `Seed__Contracts=1000000 dotnet run --project src/AssetDashboard.Api`
 ```bash
 dotnet test tests/AssetDashboard.Tests           # unit tests (no Docker needed)
 dotnet test tests/AssetDashboard.IntegrationTests # API + queries against a throwaway Postgres (Docker required)
+dotnet test tests/AssetDashboard.EndToEndTests   # whole system via Aspire + Playwright (Docker; stop any running AppHost first)
 UPDATE_API_CONTRACT=1 dotnet test tests/AssetDashboard.IntegrationTests --filter ApiContractTests  # accept an API change
 cd web && npm run api:generate                   # regenerate frontend types from contracts/openapi.v1.json
 cd web && npx ng build                         # frontend build check

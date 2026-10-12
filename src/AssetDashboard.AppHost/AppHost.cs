@@ -2,10 +2,14 @@
 // (resources, logs, traces, metrics).  dotnet run --project src/AssetDashboard.AppHost
 var builder = DistributedApplication.CreateBuilder(args);
 
-// PostgreSQL in a container with a persistent volume; the API seeds it on first start.
+// Ephemeral=true (used by the end-to-end tests): a fresh database without the persistent volume.
+var ephemeral = string.Equals(builder.Configuration["Ephemeral"], "true", StringComparison.OrdinalIgnoreCase);
+
+// PostgreSQL in a container; the API seeds it on first start.
 var postgres = builder.AddPostgres("postgres")
-    .WithImageTag("17-alpine") // same major version as docker-compose and the integration tests
-    .WithDataVolume("assetdash-aspire-pgdata17");
+    .WithImageTag("17-alpine"); // same major version as docker-compose and the integration tests
+if (!ephemeral)
+    postgres.WithDataVolume("assetdash-aspire-pgdata17");
 var database = postgres.AddDatabase("AssetDb", databaseName: "assetdashboard");
 
 // The API. "AssetDb" becomes ConnectionStrings__AssetDb; the http launch profile keeps port 5080,

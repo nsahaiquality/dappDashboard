@@ -108,6 +108,7 @@ only transport (HTTP, SignalR) and hosting.
 | `AssetDashboard.Api` | Endpoints, SignalR hub and broadcaster, startup | Infrastructure, Domain |
 | `tests/AssetDashboard.Tests` | Unit tests (domain rules, generator, filter) | Domain, Infrastructure |
 | `tests/AssetDashboard.IntegrationTests` | The real API against a throwaway Postgres (Testcontainers) | Api |
+| `tests/AssetDashboard.EndToEndTests` | The whole system started by the AppHost, driven in Chromium (Playwright) | AppHost |
 
 The web app's components are described in [frontend-guide.md](frontend-guide.md#structure).
 

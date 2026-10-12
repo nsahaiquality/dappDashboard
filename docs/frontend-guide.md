@@ -14,7 +14,7 @@ big picture.
 | HTTP | `HttpClient` with the `fetch` backend |
 | Charts | Chart.js (wrapped in one component); most bars are plain HTML/CSS |
 | Fonts | IBM Plex Sans and Mono, self-hosted through `@fontsource` (no calls to Google) |
-| Tests | Vitest (Angular's unit-test builder); Playwright end-to-end tests planned (SCRUM-73) |
+| Tests | Vitest (Angular's unit-test builder); end-to-end tests with Playwright for .NET in `tests/AssetDashboard.EndToEndTests` |
 
 Run it with `npm start` (dev server on :4200). `proxy.conf.json` forwards `/api` and `/hubs`
 (WebSocket included) to the API on :5080, so the app uses relative URLs and needs no CORS.
@@ -204,4 +204,7 @@ serious, critical).
   `aria-current`.
 - The live events list is an `aria-live="polite"` region; charts carry `role="img"` and a label.
 - Focus is visible (`:focus-visible` outline in the accent colour).
-- A full WCAG AA audit with automated checks is planned (SCRUM-59, through the end-to-end tests).
+- Every end-to-end run scans both pages in light and dark mode with axe (WCAG 2.1 A and AA rules);
+  any serious or critical violation fails the build. Primary buttons use `--accent-fill`, a darker
+  shade than `--accent` in dark mode, so white text keeps 4.5:1 contrast.
+- Scrollable regions (the live events list) are focusable so keyboard users can scroll them.
