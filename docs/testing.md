@@ -1,13 +1,13 @@
 # Testing strategy
 
-**236 automated tests at four levels**, all run by CI on every push. Each level answers a different
+**238 automated tests at four levels**, all run by CI on every push. Each level answers a different
 question. Together they show that the rules are right, that every endpoint returns what the
 database holds, and that a user sees exactly that, live, in a real browser.
 
 | Level | Project | Tests | Runtime | Proves |
 |---|---|---|---|---|
 | Backend unit | `tests/AssetDashboard.Tests` | 38 | < 1 s | Business rules and the data generator are correct |
-| Backend integration | `tests/AssetDashboard.IntegrationTests` | 155 | ~10 s (2 Postgres containers) | Every endpoint works with every filter against real PostgreSQL; figures equal independent SQL; contract and documentation are complete |
+| Backend integration | `tests/AssetDashboard.IntegrationTests` | 157 | ~50 s (3 Postgres containers) | Every endpoint works with every filter against real PostgreSQL; figures equal independent SQL; contract and documentation are complete; the simulator stays realistic over long runs |
 | Frontend unit | `web/src/**/*.spec.ts` (Vitest) | 26 | ~1.5 s | State, live-update client and page logic behave correctly; 81% line coverage |
 | End-to-end | `tests/AssetDashboard.EndToEndTests` | 17 | ~75 s incl. system start | The whole system works for a user in Chromium: journeys, screen vs database, real time, accessibility |
 
@@ -15,7 +15,7 @@ database holds, and that a user sees exactly that, live, in a real browser.
 flowchart BT
     unit["Backend unit · 38<br/><i>rules, generator</i>"]
     funit["Frontend unit · 26<br/><i>services, pages</i>"]
-    integ["Integration · 155<br/><i>API + PostgreSQL, reconciliation, contract</i>"]
+    integ["Integration · 157<br/><i>API + PostgreSQL, reconciliation, contract</i>"]
     e2e["End-to-end · 17<br/><i>Aspire + Playwright</i>"]
     unit --> integ
     funit --> e2e
@@ -44,7 +44,7 @@ dotnet test tests/AssetDashboard.EndToEndTests      # needs Docker; stop any run
 | `PortfolioGeneratorTests` | 7 | Deterministic per seed, realistic default rate and LTV, remarketing states, valuations |
 | `PortfolioFilterTests` | 4 | Filter keys (SignalR groups), normalisation, filtering in memory |
 
-### Backend integration (155)
+### Backend integration (157)
 
 Each test collection starts the real API (`WebApplicationFactory`) on a throwaway PostgreSQL 17
 container (Testcontainers), migrates and seeds it. Tests that change data use their own database.
@@ -62,6 +62,7 @@ container (Testcontainers), migrates and seeds it. Tests that change data use th
 | `HistoryApiTests` | 3 | Backfill length, totals equal the sum of classes, seam with today |
 | `SourceApiTests` + `SourceFeedSimulatorTests` | 3 | Freshness, success rate, runs; loads run once per interval |
 | `StatefulEndpointTests` | 2 | Simulator pause/resume; events endpoint keeps the last 50 |
+| `LongRunSimulationTests` | 2 | 6,000 seeded simulator steps keep LTV, exposure, default, arrears and recovery rates in realistic bands, with no arrears older than the contract and no closed contract in arrears; 600 market shocks do not make values trend |
 | `ApiContractTests` | 1 | The OpenAPI document equals the committed contract (`contracts/openapi.v1.json`) |
 
 **Proven to catch errors:** changing the "30+ days past due" rule to 31+ made the reconciliation

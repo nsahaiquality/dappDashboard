@@ -1308,7 +1308,7 @@ export interface components {
             amount?: null | number;
         };
         /** @enum {string} */
-        PortfolioEventType: "Revaluation" | "PaymentReceived" | "PaymentMissed" | "Default" | "Repossession" | "Listed" | "Sold" | "MarketShock" | "RefinancingRequested" | "RefinancingApproved" | "RefinancingDeclined" | "AuctionCompleted" | "PriceReduced" | "DataLoadFailed" | "DataLoadRecovered";
+        PortfolioEventType: "Revaluation" | "PaymentReceived" | "PaymentMissed" | "Default" | "Repossession" | "Listed" | "Sold" | "MarketShock" | "RefinancingRequested" | "RefinancingApproved" | "RefinancingDeclined" | "AuctionCompleted" | "PriceReduced" | "DataLoadFailed" | "DataLoadRecovered" | "NewBusiness";
         /** @description Global dashboard filter. Every field is optional; an empty filter means the whole portfolio. */
         PortfolioFilter: {
             assetClass?: null | components["schemas"]["AssetClass"];

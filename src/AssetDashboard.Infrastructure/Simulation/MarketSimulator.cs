@@ -24,12 +24,18 @@ public enum SimulationStep
     DecideRefinancing,
     RunAuction,
     ReducePrice,
+    /// <summary>One random open contract moves according to its credit state (see <see cref="MarketSimulator"/>).</summary>
+    CreditStep,
+    /// <summary>A new contract is written for an existing vendor and customer.</summary>
+    Originate,
 }
 
 public sealed class SimulatorOptions
 {
     public bool Enabled { get; set; } = true;
     public int EventsPerSecond { get; set; } = 4;
+    /// <summary>Fixed seed for repeatable runs (tests); random when not set.</summary>
+    public int? RandomSeed { get; set; }
 }
 
 /// <summary>
@@ -42,7 +48,7 @@ public sealed class MarketSimulator(
     IOptions<SimulatorOptions> options,
     ILogger<MarketSimulator> logger) : BackgroundService
 {
-    private readonly Random _rng = new();
+    private readonly Random _rng = options.Value.RandomSeed is { } seed ? new Random(seed) : new Random();
     private volatile bool _paused = !options.Value.Enabled;
 
     public bool IsRunning => !_paused;
@@ -77,18 +83,21 @@ public sealed class MarketSimulator(
         }
     }
 
-    private Task<PortfolioEvent?> NextEventAsync(AssetDbContext db, CancellationToken ct) => StepAsync(db, _rng.NextDouble() switch
+    /// <summary>One change chosen with the live mix of event types (what the background loop runs).</summary>
+    /// <remarks>
+    /// Credit changes go through <see cref="SimulationStep.CreditStep"/>: it visits one random open contract and moves it
+    /// according to its own state, so arrears, defaults and recoveries scale with the size of each group and settle at a
+    /// stable level (as in a real book) instead of drifting. Valuations revert towards the valuation model.
+    /// </remarks>
+    public Task<PortfolioEvent?> NextEventAsync(AssetDbContext db, CancellationToken ct = default) => StepAsync(db, _rng.NextDouble() switch
     {
-        < 0.40 => SimulationStep.Revalue,
-        < 0.65 => SimulationStep.ReceivePayment,
-        < 0.82 => SimulationStep.MissPayment,
-        < 0.90 => SimulationStep.Repossess,
-        < 0.92 => SimulationStep.ListForSale,
-        < 0.94 => SimulationStep.Sell,
-        < 0.95 => SimulationStep.RunAuction,
-        < 0.96 => SimulationStep.ReducePrice,
-        < 0.975 => SimulationStep.RequestRefinancing,
-        < 0.99 => SimulationStep.DecideRefinancing,
+        < 0.400 => SimulationStep.Revalue,
+        < 0.918 => SimulationStep.CreditStep,
+        < 0.930 => SimulationStep.Originate, // 1.2%: balances repayments and recoveries (see LongRunSimulationTests)
+        < 0.940 => SimulationStep.RunAuction,
+        < 0.950 => SimulationStep.ReducePrice,
+        < 0.965 => SimulationStep.RequestRefinancing,
+        < 0.980 => SimulationStep.DecideRefinancing,
         _ => SimulationStep.MarketShock,
     }, ct);
 
@@ -112,17 +121,25 @@ public sealed class MarketSimulator(
         SimulationStep.DecideRefinancing => DecideRefinancingAsync(db, ct),
         SimulationStep.RunAuction => RunAuctionAsync(db, ct),
         SimulationStep.ReducePrice => ReducePriceAsync(db, ct),
+        SimulationStep.CreditStep => CreditStepAsync(db, ct),
+        SimulationStep.Originate => OriginateAsync(db, ct),
         _ => throw new ArgumentOutOfRangeException(nameof(step)),
     };
 
+    /// <summary>
+    /// A desktop revaluation: the value moves part of the way towards what the valuation model says today
+    /// (age, condition, the class's market index), plus a little noise. Values therefore follow the model
+    /// instead of wandering off.
+    /// </summary>
     private async Task<PortfolioEvent?> RevalueAsync(AssetDbContext db, CancellationToken ct)
     {
         var asset = await RandomAsync(db.Assets.Where(a => a.Status == AssetStatus.InUse), a => a.Id, ct);
         if (asset is null) return null;
 
         var before = asset.MarketValue;
-        var drift = Math.Clamp(Normal(-0.004, 0.025), -0.12, 0.08);
-        asset.MarketValue = Math.Min(asset.OriginalCost, Math.Round(asset.MarketValue * (decimal)(1 + drift), 2));
+        var target = ModelValue(asset);
+        var next = before + (target - before) * RevaluationPull + target * (decimal)Normal(0, 0.012);
+        asset.MarketValue = Math.Round(Math.Clamp(next, 0, asset.OriginalCost), 2);
         asset.ForcedSaleValue = ValuationModel.ForcedSaleValue(asset.MarketValue, asset.AssetClass);
         asset.LastValuedAt = DateTime.UtcNow;
         var method = _rng.NextDouble() < 0.1 ? ValuationMethod.PhysicalInspection : ValuationMethod.IndexBased;
@@ -136,9 +153,75 @@ public sealed class MarketSimulator(
         });
         await db.SaveChangesAsync(ct);
 
+        var change = before == 0 ? 0 : (double)(asset.MarketValue / before - 1);
         return new PortfolioEvent(DateTime.UtcNow, PortfolioEventType.Revaluation,
-            $"{asset.Category} {asset.SerialNumber} revalued {Pct(drift)} to {Eur(asset.MarketValue)}",
+            $"{asset.Category} {asset.SerialNumber} revalued {Pct(change)} to {Eur(asset.MarketValue)}",
             asset.AssetClass, asset.ContractId, asset.Id, asset.MarketValue - before);
+    }
+
+    /// <summary>Share of the gap to the model value closed by one revaluation.</summary>
+    private const decimal RevaluationPull = 0.3m;
+
+    private decimal ModelValue(Asset asset)
+    {
+        var age = (DateOnly.FromDateTime(DateTime.UtcNow).DayNumber - new DateOnly(asset.YearOfManufacture, 7, 1).DayNumber) / 365.25;
+        return ValuationModel.MarketValue(asset.OriginalCost, asset.AssetClass, age, asset.Condition, MarketIndex(asset.AssetClass));
+    }
+
+    // ---- credit: one contract at a time, by its state ------------------------------------------
+
+    /// <summary>
+    /// Visits one random open contract. A current contract pays, or misses with a probability set by its
+    /// risk grade; a contract in arrears cures or rolls 30 days further (90+ = default); a defaulted
+    /// contract moves through repossession, listing and private sale (auction lots sell when their auction runs).
+    /// </summary>
+    private async Task<PortfolioEvent?> CreditStepAsync(AssetDbContext db, CancellationToken ct)
+    {
+        var contract = await RandomAsync(db.Contracts.Include(c => c.Customer)
+            .Where(c => c.Status != ContractStatus.Closed && c.OutstandingPrincipal > 0), c => c.Id, ct);
+        if (contract is null) return null;
+
+        if (contract.Status == ContractStatus.Defaulted)
+            return await AdvanceRecoveryAsync(db, contract, ct);
+
+        var roll = _rng.NextDouble();
+        if (contract.DaysPastDue == 0)
+            return roll < MissProbability(contract.Customer.RiskGrade) && CanMiss(contract)
+                ? await ApplyMissedPaymentAsync(db, contract, ct)
+                : await ApplyPaymentAsync(db, contract, ct);
+
+        // In arrears: most customers catch up; the rest fall a month further behind.
+        return roll < CureProbability || !CanMiss(contract)
+            ? await ApplyPaymentAsync(db, contract, ct)
+            : await ApplyMissedPaymentAsync(db, contract, ct);
+    }
+
+    /// <summary>Chance that a current customer misses this month's installment, by risk grade (0.6% to 9%).</summary>
+    private static double MissProbability(int riskGrade) => 0.004 + (double)CreditRisk.GradePd[Math.Clamp(riskGrade, 1, 10) - 1] * 0.43;
+
+    /// <summary>Chance that a customer in arrears pays everything owed at the next visit.</summary>
+    private const double CureProbability = 0.55;
+
+    /// <summary>Arrears can never be older than the contract itself.</summary>
+    private static bool CanMiss(Contract c) =>
+        c.DaysPastDue + 30 <= DateOnly.FromDateTime(DateTime.UtcNow).DayNumber - c.StartDate.DayNumber;
+
+    private async Task<PortfolioEvent?> AdvanceRecoveryAsync(AssetDbContext db, Contract contract, CancellationToken ct)
+    {
+        var assets = await db.Assets.Include(a => a.RemarketingCase).Include(a => a.Contract)
+            .Where(a => a.ContractId == contract.Id && a.Status != AssetStatus.Sold).ToListAsync(ct);
+        if (assets.Any(a => a.Status == AssetStatus.InUse))
+            return _rng.NextDouble() < 0.5 ? await ApplyRepossessionAsync(db, contract, ct) : null;
+
+        var repossessed = assets.Select(a => a.RemarketingCase).OfType<RemarketingCase>().FirstOrDefault(c => c.Status == RemarketingStatus.Repossessed);
+        if (repossessed is not null)
+            return _rng.NextDouble() < 0.6 ? await ApplyListingAsync(db, repossessed, ct) : null;
+
+        var privateListing = assets.Select(a => a.RemarketingCase).OfType<RemarketingCase>()
+            .FirstOrDefault(c => c.Status == RemarketingStatus.Listed && !RemarketingRules.IsAuction(c.Channel));
+        if (privateListing is not null && _rng.NextDouble() < 0.5)
+            return await ApplyPrivateSaleAsync(db, privateListing, ct);
+        return null; // waiting for its auction, or no buyer this time
     }
 
     private async Task<PortfolioEvent?> ReceivePaymentAsync(AssetDbContext db, CancellationToken ct)
@@ -146,8 +229,11 @@ public sealed class MarketSimulator(
         var contract = await RandomAsync(db.Contracts.Where(c =>
             c.OutstandingPrincipal > 0 && (c.Status == ContractStatus.Active || c.Status == ContractStatus.Delinquent
                                            || c.Status == ContractStatus.Restructured)), c => c.Id, ct);
-        if (contract is null) return null;
+        return contract is null ? null : await ApplyPaymentAsync(db, contract, ct);
+    }
 
+    private async Task<PortfolioEvent?> ApplyPaymentAsync(AssetDbContext db, Contract contract, CancellationToken ct)
+    {
         var principalPart = Math.Max(0, contract.MonthlyInstallment
                                         - Amortization.InterestPortion(contract.OutstandingPrincipal, contract.InterestRate));
         // A delinquent customer catching up pays all missed installments.
@@ -155,7 +241,11 @@ public sealed class MarketSimulator(
         contract.OutstandingPrincipal = Math.Max(0, contract.OutstandingPrincipal - principalPart * installments);
         contract.DaysPastDue = 0;
         if (contract.Status == ContractStatus.Delinquent) contract.Status = ContractStatus.Active;
-        if (contract.OutstandingPrincipal == 0) contract.Status = ContractStatus.Closed;
+        if (contract.OutstandingPrincipal == 0)
+        {
+            contract.Status = ContractStatus.Closed;
+            contract.DaysPastDue = 0;
+        }
         contract.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
@@ -166,13 +256,17 @@ public sealed class MarketSimulator(
 
     private async Task<PortfolioEvent?> MissPaymentAsync(AssetDbContext db, CancellationToken ct)
     {
-        // Weaker customers are more likely to miss: sample among higher risk grades.
+        // Weaker customers are more likely to miss: sample among higher risk grades; arrears never older than the contract.
         var minGrade = _rng.Next(4, 9);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow).DayNumber;
         var contract = await RandomAsync(db.Contracts.Where(c =>
-            (c.Status == ContractStatus.Active || c.Status == ContractStatus.Delinquent) && c.Customer.RiskGrade >= minGrade),
-            c => c.Id, ct);
-        if (contract is null) return null;
+            (c.Status == ContractStatus.Active || c.Status == ContractStatus.Delinquent) && c.Customer.RiskGrade >= minGrade
+            && c.DaysPastDue + 30 <= today - c.StartDate.DayNumber), c => c.Id, ct);
+        return contract is null ? null : await ApplyMissedPaymentAsync(db, contract, ct);
+    }
 
+    private static async Task<PortfolioEvent?> ApplyMissedPaymentAsync(AssetDbContext db, Contract contract, CancellationToken ct)
+    {
         contract.DaysPastDue += 30;
         contract.UpdatedAt = DateTime.UtcNow;
         var defaulted = contract.DaysPastDue >= 90;
@@ -191,12 +285,17 @@ public sealed class MarketSimulator(
 
     private async Task<PortfolioEvent?> RepossessAsync(AssetDbContext db, CancellationToken ct)
     {
-        var contract = await RandomAsync(db.Contracts.Include(c => c.Assets).Where(c =>
+        var contract = await RandomAsync(db.Contracts.Where(c =>
             c.Status == ContractStatus.Defaulted && c.Assets.Any(a => a.Status == AssetStatus.InUse)), c => c.Id, ct);
-        if (contract is null) return null;
+        return contract is null ? null : await ApplyRepossessionAsync(db, contract, ct);
+    }
 
-        var assets = contract.Assets.Where(a => a.Status == AssetStatus.InUse).ToList();
-        var totalCost = contract.Assets.Sum(a => a.OriginalCost);
+    private async Task<PortfolioEvent?> ApplyRepossessionAsync(AssetDbContext db, Contract contract, CancellationToken ct)
+    {
+        var all = await db.Assets.Where(a => a.ContractId == contract.Id).ToListAsync(ct);
+        var assets = all.Where(a => a.Status == AssetStatus.InUse).ToList();
+        if (assets.Count == 0) return null;
+        var totalCost = all.Sum(a => a.OriginalCost);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         foreach (var asset in assets)
         {
@@ -229,8 +328,11 @@ public sealed class MarketSimulator(
     {
         var @case = await RandomAsync(db.RemarketingCases.Include(c => c.Asset)
             .Where(c => c.Status == RemarketingStatus.Repossessed), c => c.Id, ct);
-        if (@case is null) return null;
+        return @case is null ? null : await ApplyListingAsync(db, @case, ct);
+    }
 
+    private async Task<PortfolioEvent?> ApplyListingAsync(AssetDbContext db, RemarketingCase @case, CancellationToken ct)
+    {
         @case.Status = RemarketingStatus.Listed;
         @case.ListedOn = DateOnly.FromDateTime(DateTime.UtcNow);
         @case.Asset.Status = AssetStatus.InRemarketing;
@@ -259,8 +361,11 @@ public sealed class MarketSimulator(
         var @case = await RandomAsync(db.RemarketingCases.Include(c => c.Asset).ThenInclude(a => a.Contract)
             .Where(c => c.Status == RemarketingStatus.Listed
                         && (c.Channel == RemarketingChannel.PrivateSale || c.Channel == RemarketingChannel.VendorBuyBack)), c => c.Id, ct);
-        if (@case is null) return null;
+        return @case is null ? null : await ApplyPrivateSaleAsync(db, @case, ct);
+    }
 
+    private async Task<PortfolioEvent?> ApplyPrivateSaleAsync(AssetDbContext db, RemarketingCase @case, CancellationToken ct)
+    {
         var price = Math.Round(@case.Asset.ForcedSaleValue * (decimal)Math.Clamp(Normal(1.0, 0.10), 0.6, 1.3), 2);
         await CompleteSaleAsync(db, @case, price, ct);
         await db.SaveChangesAsync(ct);
@@ -364,6 +469,7 @@ public sealed class MarketSimulator(
         {
             contract.OutstandingPrincipal = 0;
             contract.Status = ContractStatus.Closed;
+            contract.DaysPastDue = 0; // settled: nothing is overdue any more
         }
         contract.UpdatedAt = now;
     }
@@ -399,12 +505,31 @@ public sealed class MarketSimulator(
         return auction;
     }
 
+    /// <summary>
+    /// Used-equipment price index per asset class, around 1.0. Shocks move it up or down with equal chance and it
+    /// drifts back towards 1, so markets have cycles but no trend; revaluations follow it via <see cref="ModelValue"/>.
+    /// </summary>
+    private readonly Dictionary<AssetClass, double> _marketIndex = Enum.GetValues<AssetClass>().ToDictionary(c => c, _ => 1.0);
+
+    private double MarketIndex(AssetClass assetClass)
+    {
+        lock (_marketIndex) return _marketIndex[assetClass];
+    }
+
     /// <summary>Moves the value of a whole asset class at once, e.g. a drop in used-truck prices.</summary>
     private async Task<PortfolioEvent?> MarketShockAsync(AssetDbContext db, CancellationToken ct)
     {
         var assetClass = (AssetClass)_rng.Next(Enum.GetValues<AssetClass>().Length);
-        var change = (_rng.NextDouble() < 0.6 ? -1 : 1) * (0.02 + _rng.NextDouble() * 0.04);
-        var factor = (decimal)(1 + change);
+        var shock = (_rng.NextDouble() < 0.5 ? -1 : 1) * (0.02 + _rng.NextDouble() * 0.04);
+        double before, after;
+        lock (_marketIndex)
+        {
+            before = _marketIndex[assetClass];
+            after = Math.Clamp(1 + (before - 1) * 0.75 + shock, 0.85, 1.15); // pull back towards 1, then the shock
+            _marketIndex[assetClass] = after;
+        }
+        var change = after / before - 1;
+        var factor = (decimal)(after / before);
         var now = DateTime.UtcNow;
 
         var affected = await db.Assets
@@ -415,8 +540,32 @@ public sealed class MarketSimulator(
                 .SetProperty(a => a.LastValuedAt, now), ct);
 
         return new PortfolioEvent(now, PortfolioEventType.MarketShock,
-            $"Market index for {assetClass} moved {Pct(change)}: {affected.ToString("N0", Culture)} assets revalued",
+            $"Market index for {assetClass} moved {Pct(change)} to {after.ToString("0.00", Culture)}: {affected.ToString("N0", Culture)} assets revalued",
             assetClass);
+    }
+
+    /// <summary>
+    /// New business: a vendor writes a new contract for one of its customers. Keeps the book from shrinking as
+    /// contracts are repaid or recovered. Built by the same generator as the seeded portfolio.
+    /// </summary>
+    private async Task<PortfolioEvent?> OriginateAsync(AssetDbContext db, CancellationToken ct)
+    {
+        var vendor = await RandomAsync(db.Vendors, v => (long)v.Id, ct);
+        if (vendor is null) return null;
+        var customer = await RandomAsync(db.Customers.Where(c => c.Contracts.Any(k => k.AssetClass == vendor.PrimaryAssetClass)),
+            c => (long)c.Id, ct);
+        if (customer is null) return null;
+
+        var nextContract = await db.Contracts.MaxAsync(c => (long?)c.Id, ct) ?? 0;
+        var nextAsset = await db.Assets.MaxAsync(a => (long?)a.Id, ct) ?? 0;
+        var contract = new PortfolioGenerator(_rng.Next()).CreateNewBusiness(
+            (int)nextContract + 1, (int)nextAsset, vendor, customer, DateOnly.FromDateTime(DateTime.UtcNow));
+        db.Contracts.Add(contract);
+        await db.SaveChangesAsync(ct);
+
+        return new PortfolioEvent(DateTime.UtcNow, PortfolioEventType.NewBusiness,
+            $"{contract.ContractNumber}: {vendor.Name} financed {contract.Assets.Count} × {contract.Assets[0].Category} for {customer.Name} ({Eur(contract.FinancedAmount)})",
+            contract.AssetClass, contract.Id, contract.Assets[0].Id, contract.FinancedAmount);
     }
 
     private async Task<PortfolioEvent?> RequestRefinancingAsync(AssetDbContext db, CancellationToken ct)

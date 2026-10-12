@@ -63,6 +63,17 @@ public sealed class PortfolioGenerator(int seed = 42)
         }
     }
 
+    /// <summary>
+    /// One new contract starting today for an existing vendor and customer (live origination). Contract and serial
+    /// numbers continue after <paramref name="seq"/> and <paramref name="lastAssetId"/> so they stay unique.
+    /// </summary>
+    public Contract CreateNewBusiness(int seq, int lastAssetId, Vendor vendor, Customer customer, DateOnly today)
+    {
+        _asOf = today;
+        _serial = lastAssetId;
+        return NewContract(seq, AssetCatalog.For(vendor.PrimaryAssetClass), vendor, customer, today, newBusiness: true);
+    }
+
     /// <summary>Auctions created so far (grows while contracts are generated).</summary>
     public IReadOnlyCollection<Auction> Auctions => _auctions.Values;
 
@@ -112,12 +123,12 @@ public sealed class PortfolioGenerator(int seed = 42)
         };
     }
 
-    private Contract NewContract(int seq, AssetCatalog.ClassInfo info, Vendor vendor, Customer customer, DateOnly asOf)
+    private Contract NewContract(int seq, AssetCatalog.ClassInfo info, Vendor vendor, Customer customer, DateOnly asOf, bool newBusiness = false)
     {
         var term = Pick(info.TermsMonths);
         var product = Weighted(info.Products);
-        var monthsElapsed = _rng.Next(0, term);
-        var start = asOf.AddMonths(-monthsElapsed).AddDays(-_rng.Next(0, 28));
+        var monthsElapsed = newBusiness ? 0 : _rng.Next(0, term);
+        var start = newBusiness ? asOf : asOf.AddMonths(-monthsElapsed).AddDays(-_rng.Next(0, 28));
 
         // Credit state, driven by the customer's risk grade.
         var pd = 0.0025 * Math.Pow(customer.RiskGrade, 1.6);
@@ -130,6 +141,11 @@ public sealed class PortfolioGenerator(int seed = 42)
             _ when _rng.NextDouble() < 0.025 => (ContractStatus.Restructured, 0),
             _ => (ContractStatus.Active, 0),
         };
+        if (newBusiness) (status, dpd) = (ContractStatus.Active, 0);
+        // Arrears can never be older than the contract: cap them, and the status follows.
+        dpd = Math.Min(dpd, (asOf.DayNumber - start.DayNumber) / 30 * 30);
+        if (status is ContractStatus.Defaulted or ContractStatus.Delinquent)
+            status = dpd >= 90 ? ContractStatus.Defaulted : dpd >= 30 ? ContractStatus.Delinquent : ContractStatus.Active;
 
         // Assets (a contract finances one or more units of the same category).
         var category = Pick(info.Categories);
@@ -190,7 +206,7 @@ public sealed class PortfolioGenerator(int seed = 42)
 
         if (status == ContractStatus.Defaulted && dpd > 150)
             Recover(contract, info, start, monthsPaid, purchasePrice / purchaseTotal, asOf);
-        else if (status == ContractStatus.Restructured || _rng.NextDouble() < 0.04)
+        else if (!newBusiness && (status == ContractStatus.Restructured || _rng.NextDouble() < 0.04))
             AddRefinancingRequest(contract, customer, monthsElapsed, asOf);
 
         return contract;
@@ -321,6 +337,7 @@ public sealed class PortfolioGenerator(int seed = 42)
             // Sale proceeds applied; any shortfall written off.
             contract.Status = ContractStatus.Closed;
             contract.OutstandingPrincipal = 0;
+            contract.DaysPastDue = 0;
         }
     }
 
