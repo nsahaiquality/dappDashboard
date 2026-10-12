@@ -12,7 +12,11 @@ const eurKpi = new Intl.NumberFormat('en-IE', {
   minimumSignificantDigits: 3,
   maximumSignificantDigits: 3,
 });
-const eurFull = new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+const eurFull = new Intl.NumberFormat('en-IE', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
+});
 const pct = new Intl.NumberFormat('en-IE', { style: 'percent', maximumFractionDigits: 1 });
 const int = new Intl.NumberFormat('en-IE');
 
@@ -25,4 +29,7 @@ export const formatInt = (v: number) => int.format(v);
 
 /** "MaterialHandling" → "Material handling" */
 export const humanize = (s: string) =>
-  s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase()).replace(/ (\w)/g, (m) => m.toLowerCase());
+  s
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/^./, (c) => c.toUpperCase())
+    .replace(/ (\w)/g, (m) => m.toLowerCase());

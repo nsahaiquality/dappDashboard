@@ -55,27 +55,37 @@ describe('Assets page', () => {
     requests[0].reply.next(page([asset(1), asset(3)], 2)); // stale: the unfiltered request
     fixture.detectChanges();
 
-    const serials = [...(fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr.clickable .mono')].map((e) => e.textContent!.trim());
+    const serials = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr.clickable .mono'),
+    ].map((e) => e.textContent!.trim());
     expect(serials).toEqual(['TST-2024-0000002']);
   });
 
   it('shows global filters, status and search as removable chips', () => {
     const fixture = create();
     TestBed.inject(FilterService).patch({ assetClass: 'Healthcare' });
-    const component = fixture.componentInstance as unknown as { setStatus(s: string): void; applySearch(s: string): void };
+    const component = fixture.componentInstance as unknown as {
+      setStatus(s: string): void;
+      applySearch(s: string): void;
+    };
     component.setStatus('Sold');
     component.applySearch('MRI');
     TestBed.tick();
     fixture.detectChanges();
 
-    const chips = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.chip.removable')].map((c) => c.textContent!.trim());
+    const chips = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll('.chip.removable'),
+    ].map((c) => c.textContent!.trim());
     expect(chips).toEqual(['Healthcare', 'Status: Sold', 'Search: “MRI”']);
     expect(requests.at(-1)!.query).toMatchObject({ status: 'Sold', search: 'MRI', page: 1 });
   });
 
   it('changing the sort goes back to page 1', () => {
     const fixture = create();
-    const component = fixture.componentInstance as unknown as { page: { set(n: number): void }; setSort(s: string): void };
+    const component = fixture.componentInstance as unknown as {
+      page: { set(n: number): void };
+      setSort(s: string): void;
+    };
     component.page.set(3);
     TestBed.tick();
     component.setSort('Ltv');

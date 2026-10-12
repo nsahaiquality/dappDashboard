@@ -46,7 +46,9 @@ describe('Overview page', () => {
   it('filters the whole page when an asset class is clicked, and clears on a second click', async () => {
     const el = await render();
     const filters = TestBed.inject(FilterService);
-    const healthcare = [...el.querySelectorAll<HTMLButtonElement>('button.class-row:not(.head)')].find((b) => b.textContent!.includes('Healthcare'))!;
+    const healthcare = [
+      ...el.querySelectorAll<HTMLButtonElement>('button.class-row:not(.head)'),
+    ].find((b) => b.textContent!.includes('Healthcare'))!;
 
     healthcare.click();
     expect(filters.filter().assetClass).toBe('Healthcare');
@@ -56,12 +58,29 @@ describe('Overview page', () => {
 
   it('shows revaluations as signed changes and other events as amounts', async () => {
     const el = await render();
-    fake.emit('PortfolioEvent', { at: '2026-10-12T08:00:00Z', type: 'Revaluation', message: 'Tractor revalued', amount: -1234 });
-    fake.emit('PortfolioEvent', { at: '2026-10-12T08:00:01Z', type: 'Sold', message: 'Tractor sold', amount: 80_000 });
-    fake.emit('PortfolioEvent', { at: '2026-10-12T08:00:02Z', type: 'DataLoadFailed', message: 'Feed failed', amount: null });
+    fake.emit('PortfolioEvent', {
+      at: '2026-10-12T08:00:00Z',
+      type: 'Revaluation',
+      message: 'Tractor revalued',
+      amount: -1234,
+    });
+    fake.emit('PortfolioEvent', {
+      at: '2026-10-12T08:00:01Z',
+      type: 'Sold',
+      message: 'Tractor sold',
+      amount: 80_000,
+    });
+    fake.emit('PortfolioEvent', {
+      at: '2026-10-12T08:00:02Z',
+      type: 'DataLoadFailed',
+      message: 'Feed failed',
+      amount: null,
+    });
     TestBed.tick();
 
-    const rows = [...el.querySelectorAll('ol.events li')].map((li) => li.textContent!.replace(/\s+/g, ' '));
+    const rows = [...el.querySelectorAll('ol.events li')].map((li) =>
+      li.textContent!.replace(/\s+/g, ' '),
+    );
     expect(rows[0]).toContain('Load failed');
     expect(rows[1]).toContain('€80,000');
     expect(rows[2]).toContain('−€1,234');

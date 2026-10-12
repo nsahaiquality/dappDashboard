@@ -23,7 +23,8 @@ describe('DashboardHubService', () => {
     await hub.start();
   });
 
-  const setFilterCalls = () => fake.invoked.filter((c) => c.method === 'SetFilter').map((c) => c.args[0]);
+  const setFilterCalls = () =>
+    fake.invoked.filter((c) => c.method === 'SetFilter').map((c) => c.args[0]);
 
   it('connects and sends the current filter', () => {
     expect(hub.state()).toBe('connected');
@@ -64,7 +65,11 @@ describe('DashboardHubService', () => {
 
   it('keeps the newest 100 events, newest first', () => {
     for (let i = 0; i < 120; i++) {
-      const e: PortfolioEvent = { at: `2026-10-12T08:00:${String(i % 60).padStart(2, '0')}Z`, type: 'Revaluation', message: `event ${i}` };
+      const e: PortfolioEvent = {
+        at: `2026-10-12T08:00:${String(i % 60).padStart(2, '0')}Z`,
+        type: 'Revaluation',
+        message: `event ${i}`,
+      };
       fake.emit('PortfolioEvent', e);
     }
     expect(hub.events().length).toBe(100);

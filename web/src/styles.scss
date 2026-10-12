@@ -103,7 +103,12 @@ body {
   margin: 0;
   background: var(--page);
   color: var(--text-primary);
-  font: 14px/1.45 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font:
+    14px/1.45 'IBM Plex Sans',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 

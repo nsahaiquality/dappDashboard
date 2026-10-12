@@ -128,8 +128,11 @@ public sealed class MarketSimulator(
         var method = _rng.NextDouble() < 0.1 ? ValuationMethod.PhysicalInspection : ValuationMethod.IndexBased;
         db.AssetValuations.Add(new AssetValuation
         {
-            AssetId = asset.Id, ValuedAt = asset.LastValuedAt, MarketValue = asset.MarketValue,
-            ForcedSaleValue = asset.ForcedSaleValue, Method = method,
+            AssetId = asset.Id,
+            ValuedAt = asset.LastValuedAt,
+            MarketValue = asset.MarketValue,
+            ForcedSaleValue = asset.ForcedSaleValue,
+            Method = method,
         });
         await db.SaveChangesAsync(ct);
 
@@ -346,7 +349,10 @@ public sealed class MarketSimulator(
         asset.LastValuedAt = now;
         db.AssetValuations.Add(new AssetValuation
         {
-            AssetId = asset.Id, ValuedAt = now, MarketValue = price, ForcedSaleValue = price,
+            AssetId = asset.Id,
+            ValuedAt = now,
+            MarketValue = price,
+            ForcedSaleValue = price,
             Method = ValuationMethod.AuctionComparable,
         });
 

@@ -1,0 +1,2 @@
+# Generated from contracts/openapi.v1.json by npm run api:generate
+src/app/core/api.generated.ts

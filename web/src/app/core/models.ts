@@ -45,8 +45,19 @@ export const ASSET_CLASSES = [
   'MaterialHandling',
   'CleanTech',
 ] as const satisfies readonly AssetClass[];
-export const ASSET_STATUSES = ['InUse', 'Repossessed', 'InRemarketing', 'Sold', 'Returned'] as const satisfies readonly AssetStatus[];
-export const PRODUCT_TYPES = ['FinanceLease', 'OperatingLease', 'Loan', 'HirePurchase'] as const satisfies readonly ProductType[];
+export const ASSET_STATUSES = [
+  'InUse',
+  'Repossessed',
+  'InRemarketing',
+  'Sold',
+  'Returned',
+] as const satisfies readonly AssetStatus[];
+export const PRODUCT_TYPES = [
+  'FinanceLease',
+  'OperatingLease',
+  'Loan',
+  'HirePurchase',
+] as const satisfies readonly ProductType[];
 
 /**
  * The global filter as the app holds it: every field present, `null` when not set.
@@ -60,7 +71,13 @@ export interface PortfolioFilter {
   underwaterOnly: boolean;
 }
 
-export const NO_FILTER: PortfolioFilter = { assetClass: null, country: null, vendorId: null, productType: null, underwaterOnly: false };
+export const NO_FILTER: PortfolioFilter = {
+  assetClass: null,
+  country: null,
+  vendorId: null,
+  productType: null,
+  underwaterOnly: false,
+};
 
 /** True when two filters select the same data; accepts the app's filter or the one echoed in a snapshot. */
 export const sameFilter = (a: Schemas['PortfolioFilter'], b: Schemas['PortfolioFilter']) =>

@@ -29,8 +29,22 @@ export function baseOptions(): ChartConfiguration['options'] {
     animation: { duration: 250 },
     color: t.inkSecondary,
     plugins: {
-      legend: { labels: { color: t.inkSecondary, boxWidth: 12, boxHeight: 12, useBorderRadius: true, borderRadius: 2 } },
-      tooltip: { backgroundColor: t.ink, titleColor: t.surface, bodyColor: t.surface, padding: 10, cornerRadius: 6 },
+      legend: {
+        labels: {
+          color: t.inkSecondary,
+          boxWidth: 12,
+          boxHeight: 12,
+          useBorderRadius: true,
+          borderRadius: 2,
+        },
+      },
+      tooltip: {
+        backgroundColor: t.ink,
+        titleColor: t.surface,
+        bodyColor: t.surface,
+        padding: 10,
+        cornerRadius: 6,
+      },
     },
     scales: {
       x: { grid: { color: t.grid }, border: { color: t.baseline }, ticks: { color: t.muted } },

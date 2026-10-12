@@ -35,8 +35,14 @@ describe('FilterService', () => {
 
   it('describes the active filter as chips with vendor names, and resets', () => {
     filters.patch({ assetClass: 'MaterialHandling', vendorId: 7, underwaterOnly: true });
-    expect(filters.chips().map((c) => c.label)).toEqual(['Underwater contracts', 'Material handling', 'Vendor: Example Agri Dealers B.V.']);
-    expect(filters.summary()).toBe('Underwater contracts · Material handling · Vendor: Example Agri Dealers B.V.');
+    expect(filters.chips().map((c) => c.label)).toEqual([
+      'Underwater contracts',
+      'Material handling',
+      'Vendor: Example Agri Dealers B.V.',
+    ]);
+    expect(filters.summary()).toBe(
+      'Underwater contracts · Material handling · Vendor: Example Agri Dealers B.V.',
+    );
 
     filters.patch(filters.chips()[1].clear);
     expect(filters.filter().assetClass).toBeNull();

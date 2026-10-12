@@ -20,12 +20,24 @@ import { Icon } from './icon';
           <span class="dot" aria-hidden="true"></span>
           @switch (hub.state()) {
             @case ('connected') {
-              @if (simulatorRunning() === false) { Paused } @else { Live }
-              @if (hub.snapshot(); as s) { · updated {{ s.generatedAt | date: 'HH:mm:ss' }} }
+              @if (simulatorRunning() === false) {
+                Paused
+              } @else {
+                Live
+              }
+              @if (hub.snapshot(); as s) {
+                · updated {{ s.generatedAt | date: 'HH:mm:ss' }}
+              }
             }
-            @case ('reconnecting') { Reconnecting… }
-            @case ('connecting') { Connecting… }
-            @default { Offline }
+            @case ('reconnecting') {
+              Reconnecting…
+            }
+            @case ('connecting') {
+              Connecting…
+            }
+            @default {
+              Offline
+            }
           }
         </span>
         @if (simulatorRunning() !== null) {
@@ -49,14 +61,22 @@ export class PageHeader {
 
   protected readonly simulatorRunning = signal<boolean | null>(null);
   protected readonly liveClass = computed(() =>
-    this.hub.state() !== 'connected' ? this.hub.state() : this.simulatorRunning() === false ? 'paused' : 'connected',
+    this.hub.state() !== 'connected'
+      ? this.hub.state()
+      : this.simulatorRunning() === false
+        ? 'paused'
+        : 'connected',
   );
 
   constructor() {
-    this.api.getSimulator().subscribe({ next: (r) => this.simulatorRunning.set(r.running), error: () => {} });
+    this.api
+      .getSimulator()
+      .subscribe({ next: (r) => this.simulatorRunning.set(r.running), error: () => {} });
   }
 
   protected toggleSimulator() {
-    this.api.setSimulator(!this.simulatorRunning()).subscribe((r) => this.simulatorRunning.set(r.running));
+    this.api
+      .setSimulator(!this.simulatorRunning())
+      .subscribe((r) => this.simulatorRunning.set(r.running));
   }
 }

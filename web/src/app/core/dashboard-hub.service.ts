@@ -1,5 +1,10 @@
 import { Injectable, InjectionToken, computed, effect, inject, signal } from '@angular/core';
-import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
+import {
+  HubConnection,
+  HubConnectionBuilder,
+  HubConnectionState,
+  LogLevel,
+} from '@microsoft/signalr';
 import { FilterService } from './filter.service';
 import { PortfolioEvent, PortfolioSnapshot, sameFilter } from './models';
 
@@ -9,11 +14,18 @@ const MAX_EVENTS = 100;
 const RETRY_MS = 5_000;
 
 /** Creates the hub connection; replaced in unit tests with a fake. */
-export const HUB_CONNECTION_FACTORY = new InjectionToken<() => HubConnection>('HUB_CONNECTION_FACTORY', {
-  providedIn: 'root',
-  factory: () => () =>
-    new HubConnectionBuilder().withUrl('/hubs/dashboard').withAutomaticReconnect().configureLogging(LogLevel.Warning).build(),
-});
+export const HUB_CONNECTION_FACTORY = new InjectionToken<() => HubConnection>(
+  'HUB_CONNECTION_FACTORY',
+  {
+    providedIn: 'root',
+    factory: () => () =>
+      new HubConnectionBuilder()
+        .withUrl('/hubs/dashboard')
+        .withAutomaticReconnect()
+        .configureLogging(LogLevel.Warning)
+        .build(),
+  },
+);
 
 /**
  * Single SignalR connection to the backend DashboardHub.
