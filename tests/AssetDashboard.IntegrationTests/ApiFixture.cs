@@ -46,6 +46,9 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public Task<T?> GetAsync<T>(string url) => Client.GetFromJsonAsync<T>(url, Json);
 
+    /// <summary>Connection string of the test database, for independent hand-written SQL checks.</summary>
+    public string ConnectionString => _postgres.GetConnectionString();
+
     public async Task DisposeAsync()
     {
         Client.Dispose();
