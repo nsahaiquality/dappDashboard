@@ -1,5 +1,7 @@
 # dappDashboard: Asset Portfolio Dashboard
 
+[![CI](https://github.com/nsahaiquality/dappDashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/nsahaiquality/dappDashboard/actions/workflows/ci.yml)
+
 > **Disclaimer**
 > This repository is a personal learning and preparation exercise. It has **no relation to any
 > business, company, client or organisation**. All data is synthetic and randomly generated; all
@@ -119,6 +121,19 @@ Useful endpoints (all documented, with try-it-out, at http://localhost:5080/swag
 
 To regenerate the data, drop the database (`docker compose down -v`) and restart the API. For a one-off large
 portfolio: `Seed__Contracts=1000000 dotnet run --project src/AssetDashboard.Api` on an empty database.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and `feature/**` and on pull requests:
+
+| Job | Checks |
+|---|---|
+| Backend | Release build with warnings as errors, `dotnet format`, unit tests, integration tests (Testcontainers PostgreSQL, API contract, API docs), vulnerable packages, coverage summary |
+| Frontend | `npm ci`, Prettier, generated API types match the contract, Vitest with coverage, production build, `npm audit` |
+| End-to-end | The whole system through the Aspire AppHost, Playwright (Chromium): journeys, screen vs database, real time, WCAG AA |
+
+Test results, coverage reports, Playwright traces and screenshots are kept as artifacts of each run;
+latency and accessibility results appear in the run summary.
 
 ## Development
 
