@@ -260,19 +260,39 @@ the identity sequences and runs `ANALYZE`. Memory stays flat regardless of portf
 
 ## Simulator
 
-`MarketSimulator` makes about 4 changes per second:
+`MarketSimulator` makes about 4 changes per second. It is built to stay realistic for any length
+of run: every process that pushes the portfolio one way has a counterweight, so defaults, arrears,
+LTV and exposure hover around their seeded levels instead of drifting.
 
-| Change | Share of events |
-|---|---|
-| Revaluations | 40% |
-| Payments received | 25% |
-| Missed payments (skewed to weaker customers) | 17% |
-| Repossessions of defaulted contracts | 8% |
-| Listings | 2% |
-| Private sales / vendor buy-back | 2% |
-| Market shocks (a whole asset class moves 2–6%, applied with one bulk `UPDATE`) | 1% |
-| Refinancing requests / decisions (approval re-prices the contract) | 1.5% / 1.5% |
-| Auctions run (lots sold or passed in) / asking-price cuts | 1% / 1% |
+| Change | Share of events | Counterweight |
+|---|---|---|
+| Revaluations: 30% pull towards the valuation model × the class's market index, plus ±1.2% noise | 40% | Values follow the model, so they cannot wander away from it |
+| Credit step for one random open contract (see below) | 52% | Cures balance new arrears |
+| New business: a new contract for an existing customer from a vendor's main asset class | 1.2% | Balances repayments and recoveries, so exposure stays level |
+| Auctions run (lots sold or passed in) / asking-price cuts | 1% / 1% | |
+| Refinancing requests / decisions (approval re-prices the contract) | 1.5% / 1.5% | |
+| Market shocks: a whole class moves ±2–6% (one bulk `UPDATE`) | 2% | Shocks are symmetric and the index reverts towards 1.0, kept within 0.85–1.15 |
+
+**Credit state machine.** A credit step looks at the contract's state:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    Current --> Arrears: missed payment<br/>p = 0.4% + 0.43 × grade PD
+    Arrears --> Current: payment (cure, 55%)
+    Arrears --> Arrears: missed again (roll)
+    Arrears --> Defaulted: 90+ days past due
+    Defaulted --> Repossessed: 50%
+    Repossessed --> Listed: 60%
+    Listed --> Sold: private sale 50% / auction
+    Current --> Closed: last payment
+    Sold --> Closed: all assets sold
+```
+
+Two invariants hold in both the simulator and the seed generator: arrears never exceed the
+contract's age (a contract cannot be 90 days late after 30 days), and a closed contract has no
+arrears. `LongRunSimulationTests` runs 6,000 seeded steps and checks the bands and invariants (see
+[testing](testing.md)). Set `Simulator:RandomSeed` for a reproducible run.
 
 Separately, `SourceFeedSimulator` runs each source's loads on schedule and reports failures and
 recoveries to the live feed, and `HistoryRecorder` refreshes today's history rows every 5 minutes.

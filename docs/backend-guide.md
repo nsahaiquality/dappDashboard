@@ -139,13 +139,13 @@ classes, categories, price ranges, fictional manufacturers, countries and cities
 
 | Service | What it does | Cadence |
 |---|---|---|
-| `MarketSimulator` | One random change per tick: revaluation, payment, missed payment, repossession, listing, private sale, auction run, price cut, refinancing request or decision, market shock. Publishes a `PortfolioEvent` | `Simulator:EventsPerSecond` (4) |
+| `MarketSimulator` | One random change per tick: revaluation, a credit step (payment, missed payment, repossession, listing or private sale, by the contract's state), new business, auction run, price cut, refinancing request or decision, market shock. Publishes a `PortfolioEvent` ([details](domain-model.md#simulator)) | `Simulator:EventsPerSecond` (4) |
 | `SourceFeedSimulator` | Runs each source system's load when its interval has passed; publishes failures and recoveries | every 30 s |
 | `HistoryRecorder` | Rewrites today's history rows from the live portfolio | every 5 min |
 | `SnapshotBroadcaster` | Recomputes snapshots for watched filters when the portfolio changed | every 1 s |
 
 `MarketSimulator.StepAsync(db, step)` runs one specific step, so tests can exercise each one
-against a real database.
+against a real database; `NextEventAsync(db)` runs one step chosen the way the live loop chooses.
 
 ## Api: transport
 
@@ -172,7 +172,8 @@ publishes through the same interface ([architecture.md](architecture.md#from-sim
 
 - **Records for DTOs, one file per area.** XML summaries on public types appear in the Swagger
   schemas.
-- **Deterministic randomness** in generators (`new Random(seed)`); simulators use unseeded randomness.
+- **Deterministic randomness** in generators (`new Random(seed)`); simulators are unseeded unless
+  `Simulator:RandomSeed` is set (tests set it).
 - **Culture-invariant text** for event messages (`CultureInfo("en-IE")`), so the server's locale
   never changes what users read.
 - **Money** is `decimal`; ratios are rounded to 4 decimals at the edge (`Ratio`).
