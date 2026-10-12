@@ -1,6 +1,14 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { AssetDetail, AssetListItem, AssetSort, AssetStatus, PagedResult, PortfolioFilter, ReferenceData } from './models';
+import {
+  AssetDetail,
+  AssetListItem,
+  AssetSort,
+  AssetStatus,
+  PagedResult,
+  PortfolioFilter,
+  ReferenceData,
+} from './models';
 
 export interface AssetQuery {
   filter: PortfolioFilter;
@@ -39,7 +47,10 @@ export class ApiService {
   }
 
   setSimulator(running: boolean) {
-    return this.http.post<{ running: boolean }>(`/api/simulator/${running ? 'resume' : 'pause'}`, {});
+    return this.http.post<{ running: boolean }>(
+      `/api/simulator/${running ? 'resume' : 'pause'}`,
+      {},
+    );
   }
 }
 

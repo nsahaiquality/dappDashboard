@@ -64,4 +64,18 @@ public class ApiDocumentationTests(ApiFixture api)
         Assert.Equal(HttpStatusCode.Redirect, root.StatusCode);
         Assert.Equal("/swagger", root.Headers.Location!.OriginalString);
     }
+
+    [Fact]
+    public async Task Enums_are_non_null_string_schemas()
+    {
+        var schemas = (await OpenApiAsync()).GetProperty("components").GetProperty("schemas");
+        var enums = schemas.EnumerateObject().Where(s => s.Value.TryGetProperty("enum", out _)).ToList();
+
+        Assert.NotEmpty(enums);
+        Assert.All(enums, e =>
+        {
+            Assert.Equal("string", e.Value.GetProperty("type").GetString());
+            Assert.DoesNotContain(e.Value.GetProperty("enum").EnumerateArray(), v => v.ValueKind == JsonValueKind.Null);
+        });
+    }
 }

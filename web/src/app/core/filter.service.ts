@@ -21,7 +21,8 @@ export class FilterService {
     const f = this.filter();
     const vendors = this.reference().vendors;
     const chips: { label: string; clear: Partial<PortfolioFilter> }[] = [];
-    if (f.underwaterOnly) chips.push({ label: 'Underwater contracts', clear: { underwaterOnly: false } });
+    if (f.underwaterOnly)
+      chips.push({ label: 'Underwater contracts', clear: { underwaterOnly: false } });
     if (f.assetClass) chips.push({ label: humanize(f.assetClass), clear: { assetClass: null } });
     if (f.country) chips.push({ label: `Country: ${f.country}`, clear: { country: null } });
     if (f.vendorId) {

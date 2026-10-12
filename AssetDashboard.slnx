@@ -1,10 +1,13 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/AssetDashboard.Api/AssetDashboard.Api.csproj" />
+    <Project Path="src/AssetDashboard.AppHost/AssetDashboard.AppHost.csproj" />
     <Project Path="src/AssetDashboard.Domain/AssetDashboard.Domain.csproj" />
     <Project Path="src/AssetDashboard.Infrastructure/AssetDashboard.Infrastructure.csproj" />
+    <Project Path="src/AssetDashboard.ServiceDefaults/AssetDashboard.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AssetDashboard.EndToEndTests/AssetDashboard.EndToEndTests.csproj" />
     <Project Path="tests/AssetDashboard.IntegrationTests/AssetDashboard.IntegrationTests.csproj" />
     <Project Path="tests/AssetDashboard.Tests/AssetDashboard.Tests.csproj" />
   </Folder>

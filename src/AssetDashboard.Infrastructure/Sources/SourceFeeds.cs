@@ -149,6 +149,8 @@ public sealed class SourceFeedSimulator(
 
             var run = SourceCatalog.SimulateRun(SourceCatalog.For(x.Source.Kind), x.Source.Id, now, rng);
             db.LoadRuns.Add(run);
+            AssetDashboardTelemetry.SourceLoads.Add(1, new KeyValuePair<string, object?>("source", x.Source.Kind.ToString()),
+                new KeyValuePair<string, object?>("status", run.Status.ToString()));
             if (run.Status == LoadStatus.Failed)
                 events.Add(new PortfolioEvent(now, PortfolioEventType.DataLoadFailed, $"{x.Source.Name} load failed: {run.Message}"));
             else if (x.Last?.Status == LoadStatus.Failed)

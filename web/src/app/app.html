@@ -12,7 +12,13 @@
       <span class="nav-heading">Monitor</span>
       @for (item of monitor; track item.label) {
         @if (item.link) {
-          <a class="nav-item" [routerLink]="item.link" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" ariaCurrentWhenActive="page">
+          <a
+            class="nav-item"
+            [routerLink]="item.link"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+            ariaCurrentWhenActive="page"
+          >
             <app-icon [name]="item.icon" />{{ item.label }}
           </a>
         } @else {

@@ -65,6 +65,7 @@ public enum PortfolioEventType
     PriceReduced,
     DataLoadFailed,
     DataLoadRecovered,
+    NewBusiness,
 }
 
 /// <summary>A single change in the portfolio, streamed to the live event feed.</summary>

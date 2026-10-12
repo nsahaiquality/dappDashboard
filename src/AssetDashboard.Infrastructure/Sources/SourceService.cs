@@ -36,7 +36,12 @@ public sealed class SourceService(AssetDbContext db)
             .OrderBy(s => s.Id)
             .Select(s => new
             {
-                s.Id, s.Name, s.Kind, s.Owner, s.Description, s.ExpectedIntervalMinutes,
+                s.Id,
+                s.Name,
+                s.Kind,
+                s.Owner,
+                s.Description,
+                s.ExpectedIntervalMinutes,
                 Last = s.Runs.OrderByDescending(r => r.StartedAt).Select(r => new { r.StartedAt, r.Status, r.Message }).FirstOrDefault(),
                 LastSuccess = s.Runs.Where(r => r.Status != LoadStatus.Failed).Max(r => (DateTime?)r.FinishedAt),
                 Runs7 = s.Runs.Count(r => r.StartedAt >= weekAgo),

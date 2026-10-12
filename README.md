@@ -1,5 +1,7 @@
 # dappDashboard: Asset Portfolio Dashboard
 
+[![CI](https://github.com/nsahaiquality/dappDashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/nsahaiquality/dappDashboard/actions/workflows/ci.yml)
+
 > **Disclaimer**
 > This repository is a personal learning and preparation exercise. It has **no relation to any
 > business, company, client or organisation**. All data is synthetic and randomly generated; all
@@ -32,11 +34,14 @@ src/
   AssetDashboard.Infrastructure/  EF Core (Postgres), migrations, synthetic data generator,
                                   statistics queries, market simulator
   AssetDashboard.Api/             ASP.NET Core minimal API, SignalR hub, snapshot broadcaster
+  AssetDashboard.AppHost/         .NET Aspire: runs Postgres + API + Angular, dashboard with traces/metrics/logs
+  AssetDashboard.ServiceDefaults/ OpenTelemetry, health checks (/health, /alive), resilience
 tests/
   AssetDashboard.Tests/           xUnit unit tests (domain maths, generator realism, filters)
   AssetDashboard.IntegrationTests/ Real API + Postgres via Testcontainers (every query, hub, simulator)
+  AssetDashboard.EndToEndTests/   Whole system (Aspire) in a real browser (Playwright): journeys, numbers vs DB, real time, WCAG AA
 web/                              Angular 22 frontend (signals, zoneless, router, Chart.js, @microsoft/signalr, IBM Plex)
-docs/                             Architecture and domain model
+docs/                             Architecture, backend and frontend guides, domain model, ADRs
 backlog/                          Jira import file (epics + tasks)
 docker-compose.yml                PostgreSQL (+ optional pgAdmin)
 ```
@@ -50,6 +55,20 @@ docker-compose.yml                PostgreSQL (+ optional pgAdmin)
 | Docker runtime | any (Docker Desktop puts its CLI in `~/.docker/bin`; open a new terminal if `docker` isn't found) | [Docker Desktop](https://www.docker.com/products/docker-desktop/), [OrbStack](https://orbstack.dev) or `brew install colima docker docker-compose && colima start` |
 
 ## Running locally
+
+### Everything at once (recommended): .NET Aspire
+
+```bash
+dotnet run --project src/AssetDashboard.AppHost
+```
+
+This starts PostgreSQL 17 (its own container and volume), the API (seeded on first start) and the
+Angular app, and opens the **Aspire dashboard** at http://localhost:15101. There you can see every
+resource, its logs, and live **traces** (one click from a snapshot recompute to its SQL queries)
+and **metrics** (snapshot recompute time per filter, events, simulator steps, source loads). The
+app is at http://localhost:4200 and the API docs at http://localhost:5080/swagger, as below.
+
+### Step by step
 
 ```bash
 # 1. Database
@@ -103,13 +122,36 @@ Useful endpoints (all documented, with try-it-out, at http://localhost:5080/swag
 To regenerate the data, drop the database (`docker compose down -v`) and restart the API. For a one-off large
 portfolio: `Seed__Contracts=1000000 dotnet run --project src/AssetDashboard.Api` on an empty database.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and `feature/**` and on pull requests:
+
+| Job | Checks |
+|---|---|
+| Backend | Release build with warnings as errors, `dotnet format`, unit tests, integration tests (Testcontainers PostgreSQL, API contract, API docs), vulnerable packages, coverage summary |
+| Frontend | `npm ci`, Prettier, generated API types match the contract, Vitest with coverage, production build, `npm audit` |
+| End-to-end | The whole system through the Aspire AppHost, Playwright (Chromium): journeys, screen vs database, real time, WCAG AA |
+
+Test results, coverage reports, Playwright traces and screenshots are kept as artifacts of each run;
+latency and accessibility results appear in the run summary.
+
 ## Development
 
 ```bash
 dotnet test tests/AssetDashboard.Tests           # unit tests (no Docker needed)
 dotnet test tests/AssetDashboard.IntegrationTests # API + queries against a throwaway Postgres (Docker required)
+dotnet test tests/AssetDashboard.EndToEndTests   # whole system via Aspire + Playwright (Docker; stop any running AppHost first)
+UPDATE_API_CONTRACT=1 dotnet test tests/AssetDashboard.IntegrationTests --filter ApiContractTests  # accept an API change
+cd web && npm run api:generate                   # regenerate frontend types from contracts/openapi.v1.json
+cd web && npm run test:ci                         # frontend unit tests (Vitest) with coverage
 cd web && npx ng build                         # frontend build check
 dotnet ef migrations add <Name> -p src/AssetDashboard.Infrastructure -s src/AssetDashboard.Infrastructure -o Data/Migrations
 ```
 
-See [docs/architecture.md](docs/architecture.md) and [docs/domain-model.md](docs/domain-model.md).
+## Documentation
+
+See [docs/README.md](docs/README.md) for the full map:
+[architecture](docs/architecture.md) (C4 diagrams, live update flow),
+[backend guide](docs/backend-guide.md), [frontend guide](docs/frontend-guide.md),
+[domain model](docs/domain-model.md) and [decision records](docs/adr/README.md).
+The API is documented interactively at `http://localhost:5080/swagger`.

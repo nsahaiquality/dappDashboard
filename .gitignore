@@ -14,3 +14,4 @@ dist/
 # OS / editors
 .DS_Store
 .idea/
+contracts/*.received.json

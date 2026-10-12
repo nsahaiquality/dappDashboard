@@ -4,7 +4,13 @@ import { ChartConfiguration } from 'chart.js';
 import { ApiService, AssetQuery } from '../../core/api.service';
 import { FilterService } from '../../core/filter.service';
 import { formatEur, formatEurFull, formatInt, formatPct, humanize } from '../../core/format';
-import { ASSET_STATUSES, AssetDetail, AssetListItem, AssetSort, AssetStatus } from '../../core/models';
+import {
+  ASSET_STATUSES,
+  AssetDetail,
+  AssetListItem,
+  AssetSort,
+  AssetStatus,
+} from '../../core/models';
 import { ChartComponent, baseOptions, chartTheme } from '../../shared/chart';
 import { FilterBar } from '../../shared/filter-bar';
 import { Icon } from '../../shared/icon';
@@ -52,7 +58,9 @@ export class Assets {
   protected readonly searchDraft = signal('');
 
   protected readonly pages = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize)));
-  protected readonly firstRow = computed(() => (this.total() ? (this.page() - 1) * this.pageSize + 1 : 0));
+  protected readonly firstRow = computed(() =>
+    this.total() ? (this.page() - 1) * this.pageSize + 1 : 0,
+  );
   protected readonly lastRow = computed(() => Math.min(this.total(), this.page() * this.pageSize));
 
   private readonly query = computed<AssetQuery>(() => ({
@@ -68,9 +76,13 @@ export class Assets {
 
   /** Global filter chips plus this page's own status and search. */
   protected readonly chips = computed(() => {
-    const chips = this.filters.chips().map((c) => ({ label: c.label, remove: () => this.filters.patch(c.clear) }));
-    if (this.status()) chips.push({ label: `Status: ${humanize(this.status())}`, remove: () => this.setStatus('') });
-    if (this.search()) chips.push({ label: `Search: “${this.search()}”`, remove: () => this.applySearch('') });
+    const chips = this.filters
+      .chips()
+      .map((c) => ({ label: c.label, remove: () => this.filters.patch(c.clear) }));
+    if (this.status())
+      chips.push({ label: `Status: ${humanize(this.status())}`, remove: () => this.setStatus('') });
+    if (this.search())
+      chips.push({ label: `Search: “${this.search()}”`, remove: () => this.applySearch('') });
     return chips;
   });
 
@@ -165,16 +177,44 @@ export class Assets {
     (options.scales!['y'] as any).ticks.callback = (v: number) => formatEur(v);
     (options.scales!['y'] as any).beginAtZero = true;
     (options.scales!['x'] as any).grid = { display: false };
-    const line = { borderWidth: 2, pointRadius: 3, pointHoverRadius: 6, pointBorderColor: t.surface, pointBorderWidth: 2, tension: 0 };
+    const line = {
+      borderWidth: 2,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+      pointBorderColor: t.surface,
+      pointBorderWidth: 2,
+      tension: 0,
+    };
     return {
       type: 'line',
       data: {
-        labels: d.valuations.map((v) => new Date(v.valuedAt).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })),
+        labels: d.valuations.map((v) =>
+          new Date(v.valuedAt).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+        ),
         datasets: [
-          { label: 'Market value', data: d.valuations.map((v) => v.marketValue), borderColor: t.series1, backgroundColor: t.series1, ...line },
-          { label: 'Forced sale value', data: d.valuations.map((v) => v.forcedSaleValue), borderColor: t.series2, backgroundColor: t.series2, ...line },
-          { label: 'Exposure (asset share)', data: d.valuations.map((v) => v.exposureShare), borderColor: t.inkSecondary, backgroundColor: t.inkSecondary,
-            ...line, borderDash: [6, 4], pointRadius: 0 },
+          {
+            label: 'Market value',
+            data: d.valuations.map((v) => v.marketValue),
+            borderColor: t.series1,
+            backgroundColor: t.series1,
+            ...line,
+          },
+          {
+            label: 'Forced sale value',
+            data: d.valuations.map((v) => v.forcedSaleValue),
+            borderColor: t.series2,
+            backgroundColor: t.series2,
+            ...line,
+          },
+          {
+            label: 'Exposure (asset share)',
+            data: d.valuations.map((v) => v.exposureShare),
+            borderColor: t.inkSecondary,
+            backgroundColor: t.inkSecondary,
+            ...line,
+            borderDash: [6, 4],
+            pointRadius: 0,
+          },
         ],
       },
       options,

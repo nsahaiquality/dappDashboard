@@ -4,5 +4,9 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
-  providers: [provideBrowserGlobalErrorListeners(), provideHttpClient(withFetch()), provideRouter(routes, withComponentInputBinding())],
+  providers: [
+    provideBrowserGlobalErrorListeners(),
+    provideHttpClient(withFetch()),
+    provideRouter(routes, withComponentInputBinding()),
+  ],
 };
