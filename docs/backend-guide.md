@@ -186,7 +186,10 @@ publishes through the same interface ([architecture.md](architecture.md#from-sim
 4. Add a `Map<Area>` group in `Endpoints.cs` with tag, summary, description and parameter
    descriptions.
 5. Add an integration test class in `tests/AssetDashboard.IntegrationTests` (filter matrix,
-   invariants). The documentation tests check the rest.
+   invariants, reconciliation with hand-written SQL). The documentation tests check the rest.
+6. The contract test now fails: run the tests with `UPDATE_API_CONTRACT=1`, regenerate the
+   frontend types (`cd web && npm run api:generate`) and commit both
+   ([frontend-guide.md](frontend-guide.md#data-contracts)).
 
 ### Add a field or entity
 
@@ -199,9 +202,9 @@ publishes through the same interface ([architecture.md](architecture.md#from-sim
 
 1. Add the value to `PortfolioEventType` (`Dashboard/DashboardDtos.cs`).
 2. Publish it from the simulator or feed through `IPortfolioEventSink`.
-3. Add it to the frontend's `PortfolioEventType` and the overview's label and category maps
-   ([frontend-guide.md](frontend-guide.md#add-a-live-event-type)). Unknown types still render with
-   a neutral label.
+3. Update the contract and regenerate the frontend types, then add the overview's label and
+   category ([frontend-guide.md](frontend-guide.md#add-a-live-event-type)). Unknown types still
+   render with a neutral label.
 
 ## Running and debugging
 

@@ -1,6 +1,41 @@
-// Mirrors the DTOs in AssetDashboard.Infrastructure/Dashboard/DashboardDtos.cs.
-// Enums are serialised as strings by the API.
+// API types come from the contract (contracts/openapi.v1.json), generated into api.generated.ts by
+// `npm run api:generate`. Don't edit them here: change the API, update the contract, regenerate.
+// This file names them for the app and adds the few client-side types, with compile-time checks
+// that keep the hand-written parts in step with the contract.
+import type { components } from './api.generated';
 
+type Schemas = components['schemas'];
+
+export type AssetClass = Schemas['AssetClass'];
+export type AssetStatus = Schemas['AssetStatus'];
+export type AssetCondition = Schemas['AssetCondition'];
+export type ProductType = Schemas['ProductType'];
+export type ValuationMethod = Schemas['ValuationMethod'];
+export type AssetSort = Schemas['AssetSort'];
+export type PortfolioEventType = Schemas['PortfolioEventType'];
+
+export type PortfolioSnapshot = Schemas['PortfolioSnapshot'];
+export type AssetClassStat = Schemas['AssetClassStat'];
+export type DelinquencyBucket = Schemas['DelinquencyBucket'];
+export type RemarketingStat = Schemas['RemarketingStat'];
+export type VendorStat = Schemas['VendorStat'];
+export type CountryStat = Schemas['CountryStat'];
+export type PortfolioEvent = Schemas['PortfolioEvent'];
+export type AssetListItem = Schemas['AssetListItem'];
+export type ValuationPoint = Schemas['ValuationPoint'];
+export type AssetDetail = Schemas['AssetDetail'];
+export type VendorOption = Schemas['VendorOption'];
+export type ReferenceData = Schemas['ReferenceData'];
+
+/** A page of results; checked against every paged schema in the contract below. */
+export interface PagedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+// Option lists for dropdowns, in display order.
 export const ASSET_CLASSES = [
   'Agriculture',
   'Construction',
@@ -9,18 +44,14 @@ export const ASSET_CLASSES = [
   'Transportation',
   'MaterialHandling',
   'CleanTech',
-] as const;
-export type AssetClass = (typeof ASSET_CLASSES)[number];
+] as const satisfies readonly AssetClass[];
+export const ASSET_STATUSES = ['InUse', 'Repossessed', 'InRemarketing', 'Sold', 'Returned'] as const satisfies readonly AssetStatus[];
+export const PRODUCT_TYPES = ['FinanceLease', 'OperatingLease', 'Loan', 'HirePurchase'] as const satisfies readonly ProductType[];
 
-export const ASSET_STATUSES = ['InUse', 'Repossessed', 'InRemarketing', 'Sold', 'Returned'] as const;
-export type AssetStatus = (typeof ASSET_STATUSES)[number];
-
-export const PRODUCT_TYPES = ['FinanceLease', 'OperatingLease', 'Loan', 'HirePurchase'] as const;
-export type ProductType = (typeof PRODUCT_TYPES)[number];
-
-export type AssetSort = 'MarketValue' | 'Ltv' | 'DaysPastDue';
-
-/** Global dashboard filter; mirrors PortfolioFilter on the server. */
+/**
+ * The global filter as the app holds it: every field present, `null` when not set.
+ * The API's PortfolioFilter has the same fields, all optional.
+ */
 export interface PortfolioFilter {
   assetClass: AssetClass | null;
   country: string | null;
@@ -31,157 +62,26 @@ export interface PortfolioFilter {
 
 export const NO_FILTER: PortfolioFilter = { assetClass: null, country: null, vendorId: null, productType: null, underwaterOnly: false };
 
-export const sameFilter = (a: PortfolioFilter, b: PortfolioFilter) =>
-  a.assetClass === b.assetClass &&
+/** True when two filters select the same data; accepts the app's filter or the one echoed in a snapshot. */
+export const sameFilter = (a: Schemas['PortfolioFilter'], b: Schemas['PortfolioFilter']) =>
+  (a.assetClass ?? null) === (b.assetClass ?? null) &&
   (a.country ?? null) === (b.country ?? null) &&
-  a.vendorId === b.vendorId &&
-  a.productType === b.productType &&
-  a.underwaterOnly === b.underwaterOnly;
+  (a.vendorId ?? null) === (b.vendorId ?? null) &&
+  (a.productType ?? null) === (b.productType ?? null) &&
+  (a.underwaterOnly ?? false) === (b.underwaterOnly ?? false);
 
-export interface VendorOption {
-  id: number;
-  name: string;
-  assetClass: AssetClass;
-}
+// ---- compile-time contract checks (fail the build when the API changes underneath) -------------
 
-export interface ReferenceData {
-  vendors: VendorOption[];
-  countries: string[];
-}
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+type Check<T extends true> = T;
 
-export type AssetCondition = 'Excellent' | 'Good' | 'Fair' | 'Poor';
-export type ValuationMethod = 'Invoice' | 'IndexBased' | 'PhysicalInspection' | 'AuctionComparable';
-
-export interface PortfolioSnapshot {
-  generatedAt: string;
-  openContracts: number;
-  activeAssets: number;
-  totalExposure: number;
-  totalMarketValue: number;
-  totalForcedSaleValue: number;
-  loanToValue: number;
-  exposureAtRisk: number;
-  forcedSaleShortfall: number;
-  byAssetClass: AssetClassStat[];
-  delinquency: DelinquencyBucket[];
-  remarketing: RemarketingStat;
-  topVendors: VendorStat[];
-  byCountry: CountryStat[];
-  filter: PortfolioFilter;
-}
-
-export interface AssetClassStat {
-  assetClass: AssetClass;
-  assets: number;
-  marketValue: number;
-  exposure: number;
-  loanToValue: number;
-}
-
-export interface DelinquencyBucket {
-  bucket: string;
-  contracts: number;
-  exposure: number;
-}
-
-export interface RemarketingStat {
-  repossessed: number;
-  listed: number;
-  sold: number;
-  exposureAtDefault: number;
-  saleProceeds: number;
-  recoveryCosts: number;
-  recoveryRate: number;
-  averageDaysToSell: number;
-}
-
-export interface VendorStat {
-  vendorId: number;
-  name: string;
-  contracts: number;
-  exposure: number;
-}
-
-export interface CountryStat {
-  country: string;
-  assets: number;
-  marketValue: number;
-}
-
-export type PortfolioEventType =
-  | 'Revaluation'
-  | 'PaymentReceived'
-  | 'PaymentMissed'
-  | 'Default'
-  | 'Repossession'
-  | 'Listed'
-  | 'Sold'
-  | 'MarketShock'
-  | 'RefinancingRequested'
-  | 'RefinancingApproved'
-  | 'RefinancingDeclined'
-  | 'AuctionCompleted'
-  | 'PriceReduced'
-  | 'DataLoadFailed'
-  | 'DataLoadRecovered';
-
-export interface PortfolioEvent {
-  at: string;
-  type: PortfolioEventType;
-  message: string;
-  assetClass?: AssetClass;
-  contractId?: number;
-  assetId?: number;
-  amount?: number;
-}
-
-export interface AssetListItem {
-  id: number;
-  serialNumber: string;
-  assetClass: AssetClass;
-  category: string;
-  manufacturer: string;
-  model: string;
-  yearOfManufacture: number;
-  status: AssetStatus;
-  condition: AssetCondition;
-  country: string;
-  city: string;
-  marketValue: number;
-  forcedSaleValue: number;
-  lastValuedAt: string;
-  contractNumber: string;
-  daysPastDue: number;
-  /** Contract exposure ÷ market value of its remaining assets; null once sold. */
-  contractLtv: number | null;
-}
-
-export interface ValuationPoint {
-  valuedAt: string;
-  marketValue: number;
-  forcedSaleValue: number;
-  method: ValuationMethod;
-  /** This asset's share of the contract balance at that date. */
-  exposureShare: number;
-}
-
-export interface AssetDetail {
-  asset: AssetListItem;
-  originalCost: number;
-  contractExposure: number;
-  assetExposure: number;
-  productType: ProductType;
-  termMonths: number;
-  startDate: string;
-  customerName: string;
-  customerRiskGrade: number;
-  vendorName: string;
-  valuations: ValuationPoint[];
-}
-
-export interface PagedResult<T> {
-  items: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
+export type ContractChecks = [
+  // Every enum value is offered in its dropdown, and nothing else.
+  Check<Same<(typeof ASSET_CLASSES)[number], AssetClass>>,
+  Check<Same<(typeof ASSET_STATUSES)[number], AssetStatus>>,
+  Check<Same<(typeof PRODUCT_TYPES)[number], ProductType>>,
+  // The app's filter can be sent as the API's filter (SetFilter, query parameters).
+  Check<PortfolioFilter extends Schemas['PortfolioFilter'] ? true : false>,
+  // The generic page matches the contract's paged results.
+  Check<Same<PagedResult<AssetListItem>, Schemas['PagedResultOfAssetListItem']>>,
+];

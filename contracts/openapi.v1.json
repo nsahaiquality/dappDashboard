@@ -1,0 +1,3357 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Asset Portfolio Dashboard API",
+    "description": "Read API behind the asset portfolio dashboard: portfolio snapshot, assets, history, refinancing, remarketing, vendors and data sources. Live updates are pushed over SignalR at /hubs/dashboard (server messages \u0027Snapshot\u0027 and \u0027PortfolioEvent\u0027; client method \u0027SetFilter\u0027). Training exercise on synthetic data; not related to any business.",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/dashboard/snapshot": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Portfolio snapshot",
+        "description": "All headline figures and breakdowns for the overview: exposure, collateral, loan-to-value, arrears, forced-sale shortfall, by asset class, delinquency buckets, remarketing, top vendors and countries. The same object is pushed live over SignalR (/hubs/dashboard, message \u0027Snapshot\u0027). Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).",
+        "parameters": [
+          {
+            "name": "AssetClass",
+            "in": "query",
+            "description": "Only this asset class.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          },
+          {
+            "name": "Country",
+            "in": "query",
+            "description": "Only this country (ISO code, e.g. NL).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "VendorId",
+            "in": "query",
+            "description": "Only this vendor (see /api/reference).",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "ProductType",
+            "in": "query",
+            "description": "Only this financial product.",
+            "schema": {
+              "$ref": "#/components/schemas/ProductType"
+            }
+          },
+          {
+            "name": "UnderwaterOnly",
+            "in": "query",
+            "description": "Only contracts whose exposure exceeds the market value of their collateral.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioSnapshot"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/events": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Recent live events",
+        "description": "The last 50 portfolio events (payments, defaults, revaluations, auctions, refinancing, data loads), oldest first. New events are pushed live over SignalR (message \u0027PortfolioEvent\u0027).",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PortfolioEvent"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "List assets",
+        "description": "Paged list of financed assets with current values, contract loan-to-value and days past due. Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).",
+        "parameters": [
+          {
+            "name": "AssetClass",
+            "in": "query",
+            "description": "Only this asset class.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          },
+          {
+            "name": "Country",
+            "in": "query",
+            "description": "Only this country (ISO code, e.g. NL).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "VendorId",
+            "in": "query",
+            "description": "Only this vendor (see /api/reference).",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "ProductType",
+            "in": "query",
+            "description": "Only this financial product.",
+            "schema": {
+              "$ref": "#/components/schemas/ProductType"
+            }
+          },
+          {
+            "name": "UnderwaterOnly",
+            "in": "query",
+            "description": "Only contracts whose exposure exceeds the market value of their collateral.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Only assets in this status.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetStatus"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Case-insensitive match on serial number, category or contract number.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort order, highest first.",
+            "schema": {
+              "default": "MarketValue",
+              "$ref": "#/components/schemas/AssetSort"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number, starting at 1.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Rows per page, 1\u2013200.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfAssetListItem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets/export": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Export assets as CSV",
+        "description": "Same query as \u0027List assets\u0027, streamed as a CSV download (up to 100.000 rows). Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).",
+        "parameters": [
+          {
+            "name": "AssetClass",
+            "in": "query",
+            "description": "Only this asset class.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          },
+          {
+            "name": "Country",
+            "in": "query",
+            "description": "Only this country (ISO code, e.g. NL).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "VendorId",
+            "in": "query",
+            "description": "Only this vendor (see /api/reference).",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "ProductType",
+            "in": "query",
+            "description": "Only this financial product.",
+            "schema": {
+              "$ref": "#/components/schemas/ProductType"
+            }
+          },
+          {
+            "name": "UnderwaterOnly",
+            "in": "query",
+            "description": "Only contracts whose exposure exceeds the market value of their collateral.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Only assets in this status.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetStatus"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Case-insensitive match on serial number, category or contract number.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort order, highest first.",
+            "schema": {
+              "default": "MarketValue",
+              "$ref": "#/components/schemas/AssetSort"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/assets/{id}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Asset detail",
+        "description": "One asset with its contract, customer, vendor and full valuation history; each valuation point carries the asset\u0027s share of the contract balance at that date, from the repayment schedule.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Asset id.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/history": {
+      "get": {
+        "tags": [
+          "History"
+        ],
+        "summary": "Daily portfolio history",
+        "description": "One point per day: exposure, collateral, forced sale value, loan-to-value, 30\u002B and 90\u002B days past due, net recoveries. Older points are a synthetic backfill (isBackfilled = true); today\u0027s point is live.",
+        "parameters": [
+          {
+            "name": "assetClass",
+            "in": "query",
+            "description": "Only this asset class; omit for the whole portfolio.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "description": "Number of days back from today, 1\u20133650.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 365
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryPoint"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/refinancing/summary": {
+      "get": {
+        "tags": [
+          "Refinancing"
+        ],
+        "summary": "Refinancing summary",
+        "description": "Requests by status, 12-month approval rate, days to decision, pending amount, expected loss (PD \u00D7 LGD \u00D7 exposure) by asset class, the 8-quarter maturity wall with balloon amounts, and requests by reason. Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).",
+        "parameters": [
+          {
+            "name": "AssetClass",
+            "in": "query",
+            "description": "Only this asset class.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          },
+          {
+            "name": "Country",
+            "in": "query",
+            "description": "Only this country (ISO code, e.g. NL).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "VendorId",
+            "in": "query",
+            "description": "Only this vendor (see /api/reference).",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "ProductType",
+            "in": "query",
+            "description": "Only this financial product.",
+            "schema": {
+              "$ref": "#/components/schemas/ProductType"
+            }
+          },
+          {
+            "name": "UnderwaterOnly",
+            "in": "query",
+            "description": "Only contracts whose exposure exceeds the market value of their collateral.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefinancingSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/refinancing/requests": {
+      "get": {
+        "tags": [
+          "Refinancing"
+        ],
+        "summary": "Refinancing requests",
+        "description": "Requests newest first, with the risk picture at request time and the credit decision. Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).",
+        "parameters": [
+          {
+            "name": "AssetClass",
+            "in": "query",
+            "description": "Only this asset class.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          },
+          {
+            "name": "Country",
+            "in": "query",
+            "description": "Only this country (ISO code, e.g. NL).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "VendorId",
+            "in": "query",
+            "description": "Only this vendor (see /api/reference).",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "ProductType",
+            "in": "query",
+            "description": "Only this financial product.",
+            "schema": {
+              "$ref": "#/components/schemas/ProductType"
+            }
+          },
+          {
+            "name": "UnderwaterOnly",
+            "in": "query",
+            "description": "Only contracts whose exposure exceeds the market value of their collateral.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Only requests in this status.",
+            "schema": {
+              "$ref": "#/components/schemas/RefinancingStatus"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number, starting at 1.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Rows per page, 1\u2013200.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfRefinancingRequestItem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/refinancing/candidates": {
+      "get": {
+        "tags": [
+          "Refinancing"
+        ],
+        "summary": "Refinancing candidates",
+        "description": "Open contracts that need a conversation: maturing within 6 months, balloon due, underwater or 30\u002B days past due, ranked by uncovered exposure, with probability of default, loss given default and expected loss. Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).",
+        "parameters": [
+          {
+            "name": "AssetClass",
+            "in": "query",
+            "description": "Only this asset class.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          },
+          {
+            "name": "Country",
+            "in": "query",
+            "description": "Only this country (ISO code, e.g. NL).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "VendorId",
+            "in": "query",
+            "description": "Only this vendor (see /api/reference).",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "ProductType",
+            "in": "query",
+            "description": "Only this financial product.",
+            "schema": {
+              "$ref": "#/components/schemas/ProductType"
+            }
+          },
+          {
+            "name": "UnderwaterOnly",
+            "in": "query",
+            "description": "Only contracts whose exposure exceeds the market value of their collateral.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number, starting at 1.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Rows per page, 1\u2013200.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfRefinancingCandidate"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/remarketing/summary": {
+      "get": {
+        "tags": [
+          "Remarketing"
+        ],
+        "summary": "Remarketing summary",
+        "description": "Repossessed and listed stock with ageing, recovery by channel and asset class (last 12 months), cost breakdown, and the next five auctions. Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).",
+        "parameters": [
+          {
+            "name": "AssetClass",
+            "in": "query",
+            "description": "Only this asset class.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          },
+          {
+            "name": "Country",
+            "in": "query",
+            "description": "Only this country (ISO code, e.g. NL).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "VendorId",
+            "in": "query",
+            "description": "Only this vendor (see /api/reference).",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "ProductType",
+            "in": "query",
+            "description": "Only this financial product.",
+            "schema": {
+              "$ref": "#/components/schemas/ProductType"
+            }
+          },
+          {
+            "name": "UnderwaterOnly",
+            "in": "query",
+            "description": "Only contracts whose exposure exceeds the market value of their collateral.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemarketingSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/remarketing/cases": {
+      "get": {
+        "tags": [
+          "Remarketing"
+        ],
+        "summary": "Recovery cases",
+        "description": "Repossessed assets: unsold stock oldest first, then sales newest first, with days in stock, cost breakdown (storage accrues until sale) and recovery rate. Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).",
+        "parameters": [
+          {
+            "name": "AssetClass",
+            "in": "query",
+            "description": "Only this asset class.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          },
+          {
+            "name": "Country",
+            "in": "query",
+            "description": "Only this country (ISO code, e.g. NL).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "VendorId",
+            "in": "query",
+            "description": "Only this vendor (see /api/reference).",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "ProductType",
+            "in": "query",
+            "description": "Only this financial product.",
+            "schema": {
+              "$ref": "#/components/schemas/ProductType"
+            }
+          },
+          {
+            "name": "UnderwaterOnly",
+            "in": "query",
+            "description": "Only contracts whose exposure exceeds the market value of their collateral.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Only cases in this status.",
+            "schema": {
+              "$ref": "#/components/schemas/RemarketingStatus"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "description": "Only cases sold or offered through this channel.",
+            "schema": {
+              "$ref": "#/components/schemas/RemarketingChannel"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number, starting at 1.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Rows per page, 1\u2013200.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfRemarketingCaseItem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/remarketing/auctions": {
+      "get": {
+        "tags": [
+          "Remarketing"
+        ],
+        "summary": "Auctions",
+        "description": "Live and online auctions with lots, lots sold and passed in, hammer total, average bids and sell-through. With a filter, only auctions holding matching lots. Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).",
+        "parameters": [
+          {
+            "name": "AssetClass",
+            "in": "query",
+            "description": "Only this asset class.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          },
+          {
+            "name": "Country",
+            "in": "query",
+            "description": "Only this country (ISO code, e.g. NL).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "VendorId",
+            "in": "query",
+            "description": "Only this vendor (see /api/reference).",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "ProductType",
+            "in": "query",
+            "description": "Only this financial product.",
+            "schema": {
+              "$ref": "#/components/schemas/ProductType"
+            }
+          },
+          {
+            "name": "UnderwaterOnly",
+            "in": "query",
+            "description": "Only contracts whose exposure exceeds the market value of their collateral.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Scheduled (upcoming) or Completed.",
+            "schema": {
+              "$ref": "#/components/schemas/AuctionStatus"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number, starting at 1.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Rows per page, 1\u2013200.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfAuctionItem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/vendors": {
+      "get": {
+        "tags": [
+          "Vendors"
+        ],
+        "summary": "Vendor performance",
+        "description": "Vendors (partner programmes) with programme terms, exposure, loan-to-value, default rate, recovery, 12-month origination and attainment of the annual volume target. Accepts the portfolio filter (assetClass, country, vendorId, productType, underwaterOnly).",
+        "parameters": [
+          {
+            "name": "AssetClass",
+            "in": "query",
+            "description": "Only this asset class.",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          },
+          {
+            "name": "Country",
+            "in": "query",
+            "description": "Only this country (ISO code, e.g. NL).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "VendorId",
+            "in": "query",
+            "description": "Only this vendor (see /api/reference).",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "ProductType",
+            "in": "query",
+            "description": "Only this financial product.",
+            "schema": {
+              "$ref": "#/components/schemas/ProductType"
+            }
+          },
+          {
+            "name": "UnderwaterOnly",
+            "in": "query",
+            "description": "Only contracts whose exposure exceeds the market value of their collateral.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort order, highest first.",
+            "schema": {
+              "default": "Exposure",
+              "$ref": "#/components/schemas/VendorSort"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number, starting at 1.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Rows per page, 1\u2013200.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfVendorPerformance"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/vendors/{id}": {
+      "get": {
+        "tags": [
+          "Vendors"
+        ],
+        "summary": "Vendor detail",
+        "description": "One vendor: performance, 24 months of origination, mix by asset class and product, delinquency and top customers.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Vendor id.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/sources": {
+      "get": {
+        "tags": [
+          "Data sources"
+        ],
+        "summary": "Source systems",
+        "description": "Upstream systems feeding the dashboard, with last load, freshness (Fresh / Late / Stale against the expected interval), 7-day success rate, rows loaded in 24 hours and average load duration.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SourceStatus"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/{id}/runs": {
+      "get": {
+        "tags": [
+          "Data sources"
+        ],
+        "summary": "Load runs of a source",
+        "description": "Loads newest first, with duration, rows read and rejected, and the failure or warning message.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Source system id.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Only runs with this outcome.",
+            "schema": {
+              "$ref": "#/components/schemas/LoadStatus"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number, starting at 1.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Rows per page, 1\u2013200.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfLoadRunItem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/reference": {
+      "get": {
+        "tags": [
+          "Reference data"
+        ],
+        "summary": "Reference data",
+        "description": "Vendors and countries for filter dropdowns.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulator": {
+      "get": {
+        "tags": [
+          "Simulator"
+        ],
+        "summary": "Simulator state",
+        "description": "Whether the market simulator (stand-in for the client\u0027s systems) is producing live changes.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulatorState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulator/pause": {
+      "post": {
+        "tags": [
+          "Simulator"
+        ],
+        "summary": "Pause the simulator",
+        "description": "Stops live changes; the dashboard keeps showing the last figures.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulatorState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulator/resume": {
+      "post": {
+        "tags": [
+          "Simulator"
+        ],
+        "summary": "Resume the simulator",
+        "description": "Restarts live changes.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulatorState"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgeingBucket": {
+        "required": [
+          "bucket",
+          "cases",
+          "forcedSaleValue",
+          "accruedCosts"
+        ],
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "cases": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "forcedSaleValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "accruedCosts": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Unsold repossessed stock by days since repossession."
+      },
+      "AssetClass": {
+        "enum": [
+          "Agriculture",
+          "Construction",
+          "Healthcare",
+          "Technology",
+          "Transportation",
+          "MaterialHandling",
+          "CleanTech"
+        ],
+        "type": "string",
+        "description": "Broad equipment segments typical for a vendor-finance portfolio."
+      },
+      "AssetClassStat": {
+        "required": [
+          "assetClass",
+          "assets",
+          "marketValue",
+          "exposure",
+          "loanToValue"
+        ],
+        "type": "object",
+        "properties": {
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "assets": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "marketValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "exposure": {
+            "type": "number",
+            "format": "double"
+          },
+          "loanToValue": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Exposure and collateral of one asset class; LoanToValue = exposure \u00F7 market value."
+      },
+      "AssetCondition": {
+        "enum": [
+          "Excellent",
+          "Good",
+          "Fair",
+          "Poor"
+        ],
+        "type": "string"
+      },
+      "AssetDetail": {
+        "required": [
+          "asset",
+          "originalCost",
+          "contractExposure",
+          "assetExposure",
+          "productType",
+          "termMonths",
+          "startDate",
+          "customerName",
+          "customerRiskGrade",
+          "vendorName",
+          "valuations"
+        ],
+        "type": "object",
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/AssetListItem"
+          },
+          "originalCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "contractExposure": {
+            "type": "number",
+            "format": "double"
+          },
+          "assetExposure": {
+            "type": "number",
+            "format": "double"
+          },
+          "productType": {
+            "$ref": "#/components/schemas/ProductType"
+          },
+          "termMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "customerRiskGrade": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "vendorName": {
+            "type": "string"
+          },
+          "valuations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValuationPoint"
+            }
+          }
+        },
+        "description": "One asset with its contract, customer, vendor and valuation history."
+      },
+      "AssetListItem": {
+        "required": [
+          "id",
+          "serialNumber",
+          "assetClass",
+          "category",
+          "manufacturer",
+          "model",
+          "yearOfManufacture",
+          "status",
+          "condition",
+          "country",
+          "city",
+          "marketValue",
+          "forcedSaleValue",
+          "lastValuedAt",
+          "contractNumber",
+          "daysPastDue",
+          "contractLtv"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "serialNumber": {
+            "type": "string"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "category": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "yearOfManufacture": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AssetStatus"
+          },
+          "condition": {
+            "$ref": "#/components/schemas/AssetCondition"
+          },
+          "country": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "marketValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "forcedSaleValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "lastValuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "contractNumber": {
+            "type": "string"
+          },
+          "daysPastDue": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contractLtv": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "One financed asset as listed in the asset explorer."
+      },
+      "AssetSort": {
+        "enum": [
+          "MarketValue",
+          "Ltv",
+          "DaysPastDue"
+        ],
+        "type": "string"
+      },
+      "AssetStatus": {
+        "enum": [
+          "InUse",
+          "Repossessed",
+          "InRemarketing",
+          "Sold",
+          "Returned"
+        ],
+        "type": "string"
+      },
+      "AuctionItem": {
+        "required": [
+          "id",
+          "name",
+          "channel",
+          "date",
+          "location",
+          "status",
+          "lots",
+          "lotsSold",
+          "lotsPassedIn",
+          "hammerTotal",
+          "reserveTotal",
+          "averageBids",
+          "sellThrough"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/RemarketingChannel"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "location": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AuctionStatus"
+          },
+          "lots": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lotsSold": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lotsPassedIn": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hammerTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "reserveTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "averageBids": {
+            "type": "number",
+            "format": "double"
+          },
+          "sellThrough": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "An auction with lot statistics; SellThrough = sold \u00F7 (sold \u002B passed in)."
+      },
+      "AuctionStatus": {
+        "enum": [
+          "Scheduled",
+          "Completed"
+        ],
+        "type": "string"
+      },
+      "ChannelRecovery": {
+        "required": [
+          "channel",
+          "sold",
+          "proceeds",
+          "costs",
+          "exposureAtDefault",
+          "recoveryRate",
+          "averageDaysToSell"
+        ],
+        "type": "object",
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/RemarketingChannel"
+          },
+          "sold": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "proceeds": {
+            "type": "number",
+            "format": "double"
+          },
+          "costs": {
+            "type": "number",
+            "format": "double"
+          },
+          "exposureAtDefault": {
+            "type": "number",
+            "format": "double"
+          },
+          "recoveryRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "averageDaysToSell": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Sales and recovery through one channel in the last 12 months."
+      },
+      "ClassRecovery": {
+        "required": [
+          "assetClass",
+          "sold",
+          "recoveryRate",
+          "averageDaysToSell"
+        ],
+        "type": "object",
+        "properties": {
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "sold": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recoveryRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "averageDaysToSell": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Sales and recovery for one asset class in the last 12 months."
+      },
+      "CostBreakdown": {
+        "required": [
+          "transport",
+          "storage",
+          "refurbishment",
+          "sellingFees"
+        ],
+        "type": "object",
+        "properties": {
+          "transport": {
+            "type": "number",
+            "format": "double"
+          },
+          "storage": {
+            "type": "number",
+            "format": "double"
+          },
+          "refurbishment": {
+            "type": "number",
+            "format": "double"
+          },
+          "sellingFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "total": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Remarketing costs by type."
+      },
+      "CountryStat": {
+        "required": [
+          "country",
+          "assets",
+          "marketValue"
+        ],
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string"
+          },
+          "assets": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "marketValue": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Active assets and their market value in one country."
+      },
+      "DelinquencyBucket": {
+        "required": [
+          "bucket",
+          "contracts",
+          "exposure"
+        ],
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "contracts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "exposure": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Contracts and exposure in one days-past-due bucket."
+      },
+      "ExpectedLossByClass": {
+        "required": [
+          "assetClass",
+          "exposure",
+          "expectedLoss"
+        ],
+        "type": "object",
+        "properties": {
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "exposure": {
+            "type": "number",
+            "format": "double"
+          },
+          "expectedLoss": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Exposure and expected loss (PD \u00D7 LGD \u00D7 exposure) of one asset class."
+      },
+      "Freshness": {
+        "enum": [
+          "Fresh",
+          "Late",
+          "Stale"
+        ],
+        "type": "string"
+      },
+      "HistoryPoint": {
+        "required": [
+          "date",
+          "openContracts",
+          "activeAssets",
+          "exposure",
+          "marketValue",
+          "forcedSaleValue",
+          "loanToValue",
+          "exposureAtRisk",
+          "defaultedExposure",
+          "netRecoveries",
+          "isBackfilled"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "openContracts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeAssets": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "exposure": {
+            "type": "number",
+            "format": "double"
+          },
+          "marketValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "forcedSaleValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "loanToValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "exposureAtRisk": {
+            "type": "number",
+            "format": "double"
+          },
+          "defaultedExposure": {
+            "type": "number",
+            "format": "double"
+          },
+          "netRecoveries": {
+            "type": "number",
+            "format": "double"
+          },
+          "isBackfilled": {
+            "type": "boolean"
+          }
+        },
+        "description": "Portfolio figures on one day; IsBackfilled marks generated history."
+      },
+      "LoadRunItem": {
+        "required": [
+          "id",
+          "startedAt",
+          "finishedAt",
+          "durationSeconds",
+          "status",
+          "rowsRead",
+          "rowsRejected",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationSeconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LoadStatus"
+          },
+          "rowsRead": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rowsRejected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One load from a source system."
+      },
+      "LoadStatus": {
+        "enum": [
+          "Succeeded",
+          "SucceededWithWarnings",
+          "Failed"
+        ],
+        "type": "string"
+      },
+      "MaturityQuarter": {
+        "required": [
+          "year",
+          "quarter",
+          "contracts",
+          "exposure",
+          "balloonDue"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "quarter": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contracts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "exposure": {
+            "type": "number",
+            "format": "double"
+          },
+          "balloonDue": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Exposure on contracts maturing in a quarter, and the balloon / residual amounts due then."
+      },
+      "MonthlyOrigination": {
+        "required": [
+          "year",
+          "month",
+          "contracts",
+          "financed"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "month": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contracts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "financed": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "New contracts and financed amount in one month."
+      },
+      "PagedResultOfAssetListItem": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetListItem"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of results; Total counts all matching rows."
+      },
+      "PagedResultOfAuctionItem": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuctionItem"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of results; Total counts all matching rows."
+      },
+      "PagedResultOfLoadRunItem": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LoadRunItem"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of results; Total counts all matching rows."
+      },
+      "PagedResultOfRefinancingCandidate": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefinancingCandidate"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of results; Total counts all matching rows."
+      },
+      "PagedResultOfRefinancingRequestItem": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefinancingRequestItem"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of results; Total counts all matching rows."
+      },
+      "PagedResultOfRemarketingCaseItem": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemarketingCaseItem"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of results; Total counts all matching rows."
+      },
+      "PagedResultOfVendorPerformance": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VendorPerformance"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of results; Total counts all matching rows."
+      },
+      "PortfolioEvent": {
+        "required": [
+          "at",
+          "type",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PortfolioEventType"
+          },
+          "message": {
+            "type": "string"
+          },
+          "assetClass": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AssetClass"
+              }
+            ]
+          },
+          "contractId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "assetId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "amount": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "A single change in the portfolio, streamed to the live event feed."
+      },
+      "PortfolioEventType": {
+        "enum": [
+          "Revaluation",
+          "PaymentReceived",
+          "PaymentMissed",
+          "Default",
+          "Repossession",
+          "Listed",
+          "Sold",
+          "MarketShock",
+          "RefinancingRequested",
+          "RefinancingApproved",
+          "RefinancingDeclined",
+          "AuctionCompleted",
+          "PriceReduced",
+          "DataLoadFailed",
+          "DataLoadRecovered"
+        ],
+        "type": "string"
+      },
+      "PortfolioFilter": {
+        "type": "object",
+        "properties": {
+          "assetClass": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AssetClass"
+              }
+            ]
+          },
+          "country": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "vendorId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "productType": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ProductType"
+              }
+            ]
+          },
+          "underwaterOnly": {
+            "type": "boolean",
+            "default": false
+          },
+          "key": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Stable identity, used as the SignalR group name for connections sharing this filter."
+          }
+        },
+        "description": "Global dashboard filter. Every field is optional; an empty filter means the whole portfolio."
+      },
+      "PortfolioSnapshot": {
+        "required": [
+          "generatedAt",
+          "openContracts",
+          "activeAssets",
+          "totalExposure",
+          "totalMarketValue",
+          "totalForcedSaleValue",
+          "loanToValue",
+          "exposureAtRisk",
+          "forcedSaleShortfall",
+          "byAssetClass",
+          "delinquency",
+          "remarketing",
+          "topVendors",
+          "byCountry",
+          "filter"
+        ],
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "openContracts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeAssets": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalExposure": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalMarketValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalForcedSaleValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "loanToValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "exposureAtRisk": {
+            "type": "number",
+            "format": "double"
+          },
+          "forcedSaleShortfall": {
+            "type": "number",
+            "format": "double"
+          },
+          "byAssetClass": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetClassStat"
+            }
+          },
+          "delinquency": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DelinquencyBucket"
+            }
+          },
+          "remarketing": {
+            "$ref": "#/components/schemas/RemarketingStat"
+          },
+          "topVendors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VendorStat"
+            }
+          },
+          "byCountry": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CountryStat"
+            }
+          },
+          "filter": {
+            "$ref": "#/components/schemas/PortfolioFilter"
+          }
+        },
+        "description": "Everything the dashboard needs in one message; pushed to clients over SignalR."
+      },
+      "ProductType": {
+        "enum": [
+          "FinanceLease",
+          "OperatingLease",
+          "Loan",
+          "HirePurchase"
+        ],
+        "type": "string"
+      },
+      "ReasonStat": {
+        "required": [
+          "reason",
+          "requests",
+          "approved",
+          "declined"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/RefinancingReason"
+          },
+          "requests": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "approved": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "declined": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Requests and decisions for one refinancing reason."
+      },
+      "RecourseType": {
+        "enum": [
+          "None",
+          "PartialRecourse",
+          "FullRecourse",
+          "BuyBack"
+        ],
+        "type": "string",
+        "description": "What the vendor guarantees if the customer defaults."
+      },
+      "ReferenceData": {
+        "required": [
+          "vendors",
+          "countries"
+        ],
+        "type": "object",
+        "properties": {
+          "vendors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VendorOption"
+            }
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "Values for the filter dropdowns."
+      },
+      "RefinancingCandidate": {
+        "required": [
+          "contractId",
+          "contractNumber",
+          "customerName",
+          "riskGrade",
+          "assetClass",
+          "productType",
+          "exposure",
+          "marketValue",
+          "forcedSaleValue",
+          "loanToValue",
+          "daysPastDue",
+          "maturityDate",
+          "balloonDue",
+          "probabilityOfDefault",
+          "lossGivenDefault",
+          "expectedLoss",
+          "triggers"
+        ],
+        "type": "object",
+        "properties": {
+          "contractId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "contractNumber": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "riskGrade": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "productType": {
+            "$ref": "#/components/schemas/ProductType"
+          },
+          "exposure": {
+            "type": "number",
+            "format": "double"
+          },
+          "marketValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "forcedSaleValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "loanToValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "daysPastDue": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maturityDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "balloonDue": {
+            "type": "number",
+            "format": "double"
+          },
+          "probabilityOfDefault": {
+            "type": "number",
+            "format": "double"
+          },
+          "lossGivenDefault": {
+            "type": "number",
+            "format": "double"
+          },
+          "expectedLoss": {
+            "type": "number",
+            "format": "double"
+          },
+          "triggers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "An open contract worth a refinancing conversation: maturing soon, balloon due, underwater or in arrears."
+      },
+      "RefinancingReason": {
+        "enum": [
+          "CashFlowStress",
+          "Expansion",
+          "BalloonPayment",
+          "RateReduction"
+        ],
+        "type": "string"
+      },
+      "RefinancingRequestItem": {
+        "required": [
+          "id",
+          "contractId",
+          "contractNumber",
+          "customerName",
+          "assetClass",
+          "requestedAt",
+          "reason",
+          "requestedAmount",
+          "requestedTermMonths",
+          "currentRate",
+          "proposedRate",
+          "ltvAtRequest",
+          "forcedSaleCoverAtRequest",
+          "riskGradeAtRequest",
+          "expectedLossAtRequest",
+          "status",
+          "decidedAt",
+          "decisionNote"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "contractId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "contractNumber": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/RefinancingReason"
+          },
+          "requestedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "requestedTermMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currentRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "proposedRate": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "ltvAtRequest": {
+            "type": "number",
+            "format": "double"
+          },
+          "forcedSaleCoverAtRequest": {
+            "type": "number",
+            "format": "double"
+          },
+          "riskGradeAtRequest": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expectedLossAtRequest": {
+            "type": "number",
+            "format": "double"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RefinancingStatus"
+          },
+          "decidedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "decisionNote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A refinancing request with the risk picture at request time and the decision."
+      },
+      "RefinancingStatus": {
+        "enum": [
+          "Submitted",
+          "UnderReview",
+          "Approved",
+          "Declined",
+          "Withdrawn"
+        ],
+        "type": "string"
+      },
+      "RefinancingSummary": {
+        "required": [
+          "submitted",
+          "underReview",
+          "approved",
+          "declined",
+          "withdrawn",
+          "approvalRate",
+          "averageDaysToDecision",
+          "pendingAmount",
+          "expectedLoss",
+          "expectedLossByClass",
+          "maturityWall",
+          "byReason",
+          "filter"
+        ],
+        "type": "object",
+        "properties": {
+          "submitted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "underReview": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "approved": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "declined": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "withdrawn": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "approvalRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "averageDaysToDecision": {
+            "type": "number",
+            "format": "double"
+          },
+          "pendingAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "expectedLoss": {
+            "type": "number",
+            "format": "double"
+          },
+          "expectedLossByClass": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpectedLossByClass"
+            }
+          },
+          "maturityWall": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MaturityQuarter"
+            }
+          },
+          "byReason": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReasonStat"
+            }
+          },
+          "filter": {
+            "$ref": "#/components/schemas/PortfolioFilter"
+          }
+        },
+        "description": "Refinancing pipeline, expected loss and maturity wall for the filtered portfolio."
+      },
+      "RemarketingCaseItem": {
+        "required": [
+          "id",
+          "assetId",
+          "serialNumber",
+          "category",
+          "assetClass",
+          "country",
+          "yard",
+          "status",
+          "channel",
+          "repossessedOn",
+          "listedOn",
+          "soldOn",
+          "daysInStock",
+          "exposureAtDefault",
+          "forcedSaleValue",
+          "reservePrice",
+          "askingPrice",
+          "priceReductions",
+          "salePrice",
+          "transportCost",
+          "storageCost",
+          "refurbishmentCost",
+          "sellingFees",
+          "totalCosts",
+          "recoveryRate",
+          "auctionName",
+          "auctionDate",
+          "bids",
+          "timesPassedIn"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "assetId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "serialNumber": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "country": {
+            "type": "string"
+          },
+          "yard": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/RemarketingStatus"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/RemarketingChannel"
+          },
+          "repossessedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "listedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "soldOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "daysInStock": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "exposureAtDefault": {
+            "type": "number",
+            "format": "double"
+          },
+          "forcedSaleValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "reservePrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "askingPrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "priceReductions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "salePrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "transportCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "storageCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "refurbishmentCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "sellingFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalCosts": {
+            "type": "number",
+            "format": "double"
+          },
+          "recoveryRate": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "auctionName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "auctionDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "bids": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "timesPassedIn": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A repossessed asset on its way to sale, with costs and recovery."
+      },
+      "RemarketingChannel": {
+        "enum": [
+          "LiveAuction",
+          "OnlineAuction",
+          "PrivateSale",
+          "VendorBuyBack"
+        ],
+        "type": "string"
+      },
+      "RemarketingStat": {
+        "required": [
+          "repossessed",
+          "listed",
+          "sold",
+          "exposureAtDefault",
+          "saleProceeds",
+          "recoveryCosts",
+          "recoveryRate",
+          "averageDaysToSell"
+        ],
+        "type": "object",
+        "properties": {
+          "repossessed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "listed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sold": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "exposureAtDefault": {
+            "type": "number",
+            "format": "double"
+          },
+          "saleProceeds": {
+            "type": "number",
+            "format": "double"
+          },
+          "recoveryCosts": {
+            "type": "number",
+            "format": "double"
+          },
+          "recoveryRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "averageDaysToSell": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Repossession pipeline counts and recovery on sold assets."
+      },
+      "RemarketingStatus": {
+        "enum": [
+          "Repossessed",
+          "Listed",
+          "Sold"
+        ],
+        "type": "string"
+      },
+      "RemarketingSummary": {
+        "required": [
+          "repossessed",
+          "listed",
+          "soldLast12Months",
+          "stockForcedSaleValue",
+          "stockExposureAtDefault",
+          "stockAccruedCosts",
+          "ageing",
+          "byChannel",
+          "byClass",
+          "costsLast12Months",
+          "upcomingAuctions",
+          "filter"
+        ],
+        "type": "object",
+        "properties": {
+          "repossessed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "listed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soldLast12Months": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stockForcedSaleValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "stockExposureAtDefault": {
+            "type": "number",
+            "format": "double"
+          },
+          "stockAccruedCosts": {
+            "type": "number",
+            "format": "double"
+          },
+          "ageing": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgeingBucket"
+            }
+          },
+          "byChannel": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelRecovery"
+            }
+          },
+          "byClass": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassRecovery"
+            }
+          },
+          "costsLast12Months": {
+            "$ref": "#/components/schemas/CostBreakdown"
+          },
+          "upcomingAuctions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuctionItem"
+            }
+          },
+          "filter": {
+            "$ref": "#/components/schemas/PortfolioFilter"
+          }
+        },
+        "description": "Recovery pipeline, stock ageing, recovery rates, costs and upcoming auctions."
+      },
+      "SimulatorState": {
+        "required": [
+          "running"
+        ],
+        "type": "object",
+        "properties": {
+          "running": {
+            "type": "boolean"
+          }
+        },
+        "description": "Whether the market simulator is producing live changes."
+      },
+      "SourceKind": {
+        "enum": [
+          "CoreLeasing",
+          "ValuationProvider",
+          "AuctionHouse",
+          "CreditBureau",
+          "Erp"
+        ],
+        "type": "string"
+      },
+      "SourceStatus": {
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "owner",
+          "description",
+          "expectedIntervalMinutes",
+          "lastRunAt",
+          "lastStatus",
+          "lastMessage",
+          "lastSuccessAt",
+          "minutesSinceSuccess",
+          "freshness",
+          "runs7Days",
+          "successRate7Days",
+          "rowsRead24Hours",
+          "averageDurationSeconds7Days"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SourceKind"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "expectedIntervalMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastRunAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastStatus": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LoadStatus"
+              }
+            ]
+          },
+          "lastMessage": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastSuccessAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "minutesSinceSuccess": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/Freshness"
+          },
+          "runs7Days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "successRate7Days": {
+            "type": "number",
+            "format": "double"
+          },
+          "rowsRead24Hours": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "averageDurationSeconds7Days": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "An upstream source system with its latest load, freshness and reliability."
+      },
+      "ValuationMethod": {
+        "enum": [
+          "Invoice",
+          "IndexBased",
+          "PhysicalInspection",
+          "AuctionComparable"
+        ],
+        "type": "string"
+      },
+      "ValuationPoint": {
+        "required": [
+          "valuedAt",
+          "marketValue",
+          "forcedSaleValue",
+          "method",
+          "exposureShare"
+        ],
+        "type": "object",
+        "properties": {
+          "valuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "marketValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "forcedSaleValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "method": {
+            "$ref": "#/components/schemas/ValuationMethod"
+          },
+          "exposureShare": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "One valuation of an asset, with the asset\u0027s share of the contract balance at that date."
+      },
+      "VendorDetail": {
+        "required": [
+          "performance",
+          "origination",
+          "byAssetClass",
+          "byProduct",
+          "delinquency",
+          "topCustomers"
+        ],
+        "type": "object",
+        "properties": {
+          "performance": {
+            "$ref": "#/components/schemas/VendorPerformance"
+          },
+          "origination": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonthlyOrigination"
+            }
+          },
+          "byAssetClass": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VendorMix"
+            }
+          },
+          "byProduct": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VendorMix"
+            }
+          },
+          "delinquency": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DelinquencyBucket"
+            }
+          },
+          "topCustomers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VendorMix"
+            }
+          }
+        },
+        "description": "One vendor with origination history, mixes, delinquency and top customers."
+      },
+      "VendorMix": {
+        "required": [
+          "key",
+          "contracts",
+          "exposure"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "contracts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "exposure": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Contracts and exposure in one category (asset class, product or customer)."
+      },
+      "VendorOption": {
+        "required": [
+          "id",
+          "name",
+          "assetClass"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          }
+        },
+        "description": "A vendor for filter dropdowns."
+      },
+      "VendorPerformance": {
+        "required": [
+          "id",
+          "name",
+          "country",
+          "assetClass",
+          "programType",
+          "recourse",
+          "rating",
+          "onboardedOn",
+          "contracts",
+          "openContracts",
+          "exposure",
+          "marketValue",
+          "loanToValue",
+          "defaultRate",
+          "recoveryRate",
+          "origination12Months",
+          "annualVolumeTarget",
+          "targetAttainment"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "programType": {
+            "$ref": "#/components/schemas/VendorProgramType"
+          },
+          "recourse": {
+            "$ref": "#/components/schemas/RecourseType"
+          },
+          "rating": {
+            "type": "string"
+          },
+          "onboardedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "contracts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "openContracts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "exposure": {
+            "type": "number",
+            "format": "double"
+          },
+          "marketValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "loanToValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "defaultRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "recoveryRate": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "origination12Months": {
+            "type": "number",
+            "format": "double"
+          },
+          "annualVolumeTarget": {
+            "type": "number",
+            "format": "double"
+          },
+          "targetAttainment": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "A vendor programme: terms, exposure, risk and origination against target."
+      },
+      "VendorProgramType": {
+        "enum": [
+          "Manufacturer",
+          "Dealer",
+          "Distributor"
+        ],
+        "type": "string"
+      },
+      "VendorSort": {
+        "enum": [
+          "Exposure",
+          "DefaultRate",
+          "Origination",
+          "TargetAttainment"
+        ],
+        "type": "string"
+      },
+      "VendorStat": {
+        "required": [
+          "vendorId",
+          "name",
+          "contracts",
+          "exposure"
+        ],
+        "type": "object",
+        "properties": {
+          "vendorId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "contracts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "exposure": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "A vendor ranked by exposure on open contracts."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Dashboard"
+    },
+    {
+      "name": "Assets"
+    },
+    {
+      "name": "History"
+    },
+    {
+      "name": "Refinancing"
+    },
+    {
+      "name": "Remarketing"
+    },
+    {
+      "name": "Vendors"
+    },
+    {
+      "name": "Data sources"
+    },
+    {
+      "name": "Reference data"
+    },
+    {
+      "name": "Simulator"
+    }
+  ]
+}

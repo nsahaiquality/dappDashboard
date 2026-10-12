@@ -155,10 +155,24 @@ Conventions behind the look:
 
 ## Data contracts
 
-`core/models.ts` mirrors the API records by hand: same property names (camelCase), enums as
-string unions (`'Agriculture' | 'Construction' | ...`). When an API record changes, change it here
-too. SCRUM-72 replaces the hand-written types with types generated from the OpenAPI document,
-plus a check that fails when they drift.
+The API's types are **generated**, not written by hand. The contract is the OpenAPI document
+committed at `contracts/openapi.v1.json`; `npm run api:generate` turns it into
+`core/api.generated.ts` (openapi-typescript, run through `npx` at a pinned version because it
+declares support for TypeScript 5 only). `core/models.ts` gives the generated types short names
+(`PortfolioSnapshot`, `AssetListItem`, ...) and adds the few client-side types.
+
+Compile-time checks in `models.ts` fail the build when the hand-written parts drift: the dropdown
+option lists must contain exactly the contract's enum values, the app's `PortfolioFilter` must be
+sendable as the API's filter, and `PagedResult<T>` must match the contract's paged results.
+
+When the API changes on purpose:
+
+1. Run the backend tests with `UPDATE_API_CONTRACT=1` (rewrites `contracts/openapi.v1.json`).
+2. `cd web && npm run api:generate`, then fix any compile errors the new types reveal.
+3. Commit the contract, the generated file and the fixes together.
+
+`npm run api:check` regenerates into a temporary file and fails if it differs from the committed
+`api.generated.ts` (used by CI).
 
 ## Recipes
 
@@ -168,7 +182,7 @@ plus a check that fails when they drift.
    `FilterBar`.
 2. Add a lazy route in `app.routes.ts` and give its sidebar entry a `link` in `app.ts`.
 3. Read the filter from `FilterService`; call the page's endpoint through `ApiService` (add a
-   method and its types in `models.ts`).
+   method; name the generated types you need in `models.ts`).
 4. Derive view models with `computed`; reload with an `effect` on a query signal (see the asset
    explorer).
 
@@ -179,8 +193,9 @@ computed in `overview.ts`: label, formatted value, sub-line and its context bar 
 
 ### Add a live event type
 
-Add it to `PortfolioEventType` in `models.ts`, then to `EVENT_CATEGORY` and `EVENT_STYLE` in
-`overview.ts` (label and tone: neutral, good, warning, serious, critical).
+After the backend adds it, update the contract and regenerate (see Data contracts); then add it to
+`EVENT_CATEGORY` and `EVENT_STYLE` in `overview.ts` (label and tone: neutral, good, warning,
+serious, critical).
 
 ## Accessibility
 

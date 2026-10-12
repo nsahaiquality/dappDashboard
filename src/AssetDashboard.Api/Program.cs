@@ -59,6 +59,19 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((document, _, _) =>
                       "Training exercise on synthetic data; not related to any business.",
     };
     return Task.CompletedTask;
+}).AddSchemaTransformer((schema, context, _) =>
+{
+    // Enums are serialised as strings; say so, so Swagger and generated clients type them as string unions.
+    // A shared enum schema must not list null: when the enum is first met as an optional parameter, the
+    // generator adds null to the component, and every non-null use of it would then look nullable.
+    var type = Nullable.GetUnderlyingType(context.JsonTypeInfo.Type) ?? context.JsonTypeInfo.Type;
+    if (type.IsEnum)
+    {
+        schema.Type = Microsoft.OpenApi.JsonSchemaType.String;
+        if (schema.Enum is { } values)
+            foreach (var value in values.Where(v => v is null).ToList()) values.Remove(value);
+    }
+    return Task.CompletedTask;
 }));
 builder.Services.AddHealthChecks();
 

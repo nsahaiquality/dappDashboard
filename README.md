@@ -108,6 +108,8 @@ portfolio: `Seed__Contracts=1000000 dotnet run --project src/AssetDashboard.Api`
 ```bash
 dotnet test tests/AssetDashboard.Tests           # unit tests (no Docker needed)
 dotnet test tests/AssetDashboard.IntegrationTests # API + queries against a throwaway Postgres (Docker required)
+UPDATE_API_CONTRACT=1 dotnet test tests/AssetDashboard.IntegrationTests --filter ApiContractTests  # accept an API change
+cd web && npm run api:generate                   # regenerate frontend types from contracts/openapi.v1.json
 cd web && npx ng build                         # frontend build check
 dotnet ef migrations add <Name> -p src/AssetDashboard.Infrastructure -s src/AssetDashboard.Infrastructure -o Data/Migrations
 ```

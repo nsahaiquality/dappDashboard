@@ -218,7 +218,7 @@ export class Overview {
 }
 
 /** Revaluations carry a change in value, so they get an explicit sign. */
-function eventAmount(e: { type: PortfolioEventType; amount?: number }) {
+function eventAmount(e: { type: PortfolioEventType; amount?: number | null }) {
   if (e.amount == null) return '';
   if (e.type === 'Revaluation' || e.type === 'PriceReduced') return (e.amount >= 0 ? '+' : '−') + formatEurFull(Math.abs(e.amount));
   return formatEurFull(e.amount);

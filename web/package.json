@@ -6,7 +6,9 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "api:generate": "npx --yes openapi-typescript@7.13.0 ../contracts/openapi.v1.json -o src/app/core/api.generated.ts",
+    "api:check": "npx --yes openapi-typescript@7.13.0 ../contracts/openapi.v1.json -o .api.generated.check.ts && diff -q src/app/core/api.generated.ts .api.generated.check.ts && rm .api.generated.check.ts"
   },
   "private": true,
   "packageManager": "npm@11.19.1",
